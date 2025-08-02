@@ -2,3 +2,4 @@ django
 pgvector
 docling
 openai
+django-ninja

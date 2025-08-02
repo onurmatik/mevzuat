@@ -16,7 +16,15 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from ninja import NinjaAPI
+from mevzuat.documents.api import router as documents_router
+
+
+api = NinjaAPI()
+api.add_router("/documents", documents_router)
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path("api/", api.urls),
 ]
