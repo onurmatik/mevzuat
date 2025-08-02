@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 import requests
 
 from django.db import models
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
@@ -132,6 +133,19 @@ class Document(models.Model):
             self.save(update_fields=["markdown"])
 
         return self.markdown
+
+    def get_vectorstore_id(self):
+        """Return the vectorstore id for this document type.
+
+        Looks up ``settings.VECTORESTORES`` using the child class name.
+        """
+        stores = getattr(settings, "VECTORESTORES", {})
+        try:
+            return stores[self.__class__.__name__]
+        except KeyError as exc:
+            raise KeyError(
+                f"No vectorstore id configured for {self.__class__.__name__}"
+            ) from exc
 
     def get_metadata(self):
         raise NotImplementedError("Child class should implement get_metadata()")
