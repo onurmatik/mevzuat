@@ -134,6 +134,52 @@ class Document(models.Model):
 
         return self.markdown
 
+    def upload_to_vectorstore(self, client=None):
+        """Upload the document to the configured OpenAI vector store.
+
+        The file is first uploaded to OpenAI and then attached to the
+        vector store returned by :meth:`get_vectorstore_id`.
+
+        Parameters
+        ----------
+        client : openai.OpenAI, optional
+            An existing OpenAI client instance. If ``None`` a new client will
+            be created using default configuration.
+
+        Returns
+        -------
+        str
+            The uploaded OpenAI file id.
+
+        Raises
+        ------
+        ValueError
+            If ``self.document`` is empty.
+        """
+        if not self.document:
+            raise ValueError("No document available to upload")
+
+        # Import lazily so openai is only required when this method is used.
+        from openai import OpenAI
+
+        client = client or OpenAI()
+
+        # Upload the file to OpenAI first.
+        with open(self.document.path, "rb") as f:
+            uploaded_file = client.files.create(file=f, purpose="user_data")
+
+        self.oai_file_id = uploaded_file.id
+        self.save(update_fields=["oai_file_id"])
+
+        # Attach the uploaded file to the vector store.
+        vector_store_id = self.get_vectorstore_id()
+        client.vector_stores.files.create(
+            vector_store_id=vector_store_id,
+            file_id=uploaded_file.id,
+        )
+
+        return uploaded_file.id
+
     def get_vectorstore_id(self):
         """Return the vectorstore id for this document type.
 

@@ -41,7 +41,11 @@ class MevzuatAdmin(admin.ModelAdmin):
     )
     search_fields = ("mevzuat_no", "name")
     ordering = ("-resmi_gazete_tarihi", "-kabul_tarih")
-    actions = ("fetch_selected_documents", "convert_selected_to_markdown",)
+    actions = (
+        "fetch_selected_documents",
+        "convert_selected_to_markdown",
+        "upload_selected_to_vectorstore",
+    )
 
     @admin.display(boolean=True, description="Has document?", ordering="document")
     def has_document(self, obj: Mevzuat) -> bool:
@@ -89,6 +93,30 @@ class MevzuatAdmin(admin.ModelAdmin):
             self.message_user(
                 request,
                 f"{failed} document(s) could not be converted – see log.",
+                level=messages.WARNING,
+            )
+
+    @admin.action(
+        description="Upload document to OpenAI vector store for selected Mevzuat"
+    )
+    def upload_selected_to_vectorstore(self, request, queryset):
+        ok, failed = 0, 0
+        for obj in queryset:
+            try:
+                obj.upload_to_vectorstore()
+                ok += 1
+            except Exception:
+                failed += 1
+        if ok:
+            self.message_user(
+                request,
+                f"Successfully uploaded {ok} document(s).",
+                level=messages.SUCCESS,
+            )
+        if failed:
+            self.message_user(
+                request,
+                f"{failed} document(s) could not be uploaded – see log.",
                 level=messages.WARNING,
             )
 
