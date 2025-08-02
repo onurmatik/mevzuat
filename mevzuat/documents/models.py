@@ -183,14 +183,13 @@ class Document(models.Model):
     def get_vectorstore_id(self):
         """Return the vectorstore id for this document type.
 
-        Looks up ``settings.VECTORESTORES`` using the child class name.
+        Looks up ``settings.VECTORSTORES`` using the child class name.
         """
-        stores = getattr(settings, "VECTORESTORES", {})
         try:
-            return stores[self.__class__.__name__]
+            return settings.VECTORSTORES[self.__class__.__name__]
         except KeyError as exc:
             raise KeyError(
-                f"No vectorstore id configured for {self.__class__.__name__}"
+                f"No vectorstore configured for {self.__class__.__name__}"
             ) from exc
 
     def get_metadata(self):

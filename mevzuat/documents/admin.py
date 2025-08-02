@@ -1,7 +1,7 @@
 from django.contrib import admin, messages
 from django.utils.html import format_html
 
-from .models import Mevzuat
+from .models import Document, Mevzuat
 
 
 class HasDocumentFilter(admin.SimpleListFilter):
@@ -27,10 +27,10 @@ class MevzuatAdmin(admin.ModelAdmin):
         "name_short",
         "mevzuat_tur",
         "resmi_gazete_tarihi",
-        "mukerrer",
-        "has_old_law",
         "pdf_link",
-        "has_document",
+        "has_pdf",
+        "has_md",
+        "in_vs",
     )
     list_filter = (
         "mevzuat_tur",
@@ -47,9 +47,17 @@ class MevzuatAdmin(admin.ModelAdmin):
         "upload_selected_to_vectorstore",
     )
 
-    @admin.display(boolean=True, description="Has document?", ordering="document")
-    def has_document(self, obj: Mevzuat) -> bool:
+    @admin.display(boolean=True, description="Has pdf?", ordering="document")
+    def has_pdf(self, obj: Document) -> bool:
         return bool(obj.document)
+
+    @admin.display(boolean=True, description="Has md?")
+    def has_md(self, obj: Document) -> bool:
+        return bool(obj.markdown)
+
+    @admin.display(boolean=True, description="In VS?")
+    def in_vs(self, obj: Document) -> bool:
+        return bool(obj.oai_file_id)
 
     @admin.action(description="Fetch and attach PDF for selected Mevzuat")
     def fetch_selected_documents(self, request, queryset):
@@ -102,11 +110,7 @@ class MevzuatAdmin(admin.ModelAdmin):
     def upload_selected_to_vectorstore(self, request, queryset):
         ok, failed = 0, 0
         for obj in queryset:
-            try:
-                obj.upload_to_vectorstore()
-                ok += 1
-            except Exception:
-                failed += 1
+            obj.upload_to_vectorstore()
         if ok:
             self.message_user(
                 request,
