@@ -1,10 +1,18 @@
 from typing import Optional
 
+from django.conf import settings
 from ninja import Router, Schema
 from openai import OpenAI
 
 
 router = Router()
+
+
+class VectorStoreOut(Schema):
+    """Schema representing an available vector store."""
+
+    name: str
+    id: str
 
 
 class VectorSearchPayload(Schema):
@@ -29,3 +37,13 @@ def search_vector_store(request, vs_id: str, payload: VectorSearchPayload):
         rewrite_query=payload.rewrite_query,
     )
     return response
+
+
+@router.get("/vector-stores", response=list[VectorStoreOut])
+def list_vector_stores(request):
+    """Return the vector stores configured in settings."""
+
+    return [
+        {"name": name, "id": vs_id}
+        for name, vs_id in settings.VECTORSTORES.items()
+    ]
