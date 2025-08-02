@@ -21,8 +21,8 @@ def document_upload_to(instance, filename):
 class Document(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4)
     document = models.FileField(upload_to=document_upload_to)
-    markdown = models.FileField(upload_to=document_upload_to)
-    oai_id = models.CharField(max_length=100, blank=True, null=True)
+    markdown = models.FileField(upload_to=document_upload_to, blank=True, null=True)
+    oai_file_id = models.CharField(max_length=100, blank=True, null=True)
     embedding = VectorField(dimensions=1536, blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -86,11 +86,10 @@ class Document(models.Model):
 
         # Derive a sensible filename, e.g. '1.5.7557.pdf'
         filename = os.path.basename(urlparse(pdf_url).path) or f"{self.uuid}.pdf"
-        relative_path = self.get_document_upload_to(filename)
 
         # Save inside a transaction so the DB row and the file write stay in sync
         with transaction.atomic():
-            self.document.save(relative_path, ContentFile(response.content), save=False)
+            self.document.save(filename, ContentFile(response.content), save=False)
             self.save(update_fields=["document"])
 
         return self.document
