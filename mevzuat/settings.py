@@ -6,6 +6,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+VECTORSTORES = {
+    key.replace("VECTORSTORE_", ""): value
+    for key, value in os.environ.items()
+    if key.startswith("VECTORSTORE_")
+}
+
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
