@@ -1,29 +1,50 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
-const VECTOR_STORE_ID = process.env.NEXT_PUBLIC_VECTOR_STORE_ID ?? ""
+interface VectorStore {
+  name: string
+  id: string
+}
 
 export default function SearchPage() {
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  const [vectorStores, setVectorStores] = useState<VectorStore[]>([])
+
+  useEffect(() => {
+    async function fetchVectorStores() {
+      try {
+        const res = await fetch("/api/documents/vector-stores")
+        const data = await res.json()
+        setVectorStores(data || [])
+      } catch (err) {
+        console.error(err)
+      }
+    }
+    fetchVectorStores()
+  }, [])
 
   async function onSearch(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    if (!query || !VECTOR_STORE_ID) return
+    if (!query || vectorStores.length === 0) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/documents/vector-stores/${VECTOR_STORE_ID}/search`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
-      })
-      const data = await res.json()
-      setResults(data?.data || [])
+      const responses = await Promise.all(
+        vectorStores.map((vs) =>
+          fetch(`/api/documents/vector-stores/${vs.id}/search`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query }),
+          }).then((r) => r.json())
+        )
+      )
+      const combined = responses.flatMap((r) => r?.data || [])
+      setResults(combined)
     } catch (err) {
       console.error(err)
       setResults([])
