@@ -61,7 +61,7 @@ class MevzuatAdmin(admin.ModelAdmin):
         ok, failed = 0, 0
         for obj in queryset:
             try:
-                obj.fetch_and_store_document(overwrite=False)
+                obj.fetch_and_store_document(overwrite=True)
                 ok += 1
             except Exception:
                 failed += 1
