@@ -34,13 +34,10 @@ class MevzuatAdmin(admin.ModelAdmin):
     )
     list_filter = (
         "mevzuat_tur",
-        "mukerrer",
-        "has_old_law",
-        ("kabul_tarih", admin.DateFieldListFilter),
         ("resmi_gazete_tarihi", admin.DateFieldListFilter),
     )
     search_fields = ("mevzuat_no", "name")
-    ordering = ("-resmi_gazete_tarihi", "-kabul_tarih")
+    ordering = ("-resmi_gazete_tarihi",)
     actions = (
         "fetch_selected_documents",
         "convert_selected_to_markdown",
