@@ -8,6 +8,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from pgvector.django import VectorField, L2Distance, HnswIndex, HalfVectorField
+from docling.document_converter import DocumentConverter
 
 
 def document_upload_to(instance, filename):
@@ -93,6 +94,44 @@ class Document(models.Model):
             self.save(update_fields=["document"])
 
         return self.document
+
+    def convert_pdf_to_markdown(self, *, overwrite: bool = False) -> "models.FileField":
+        """Convert the stored PDF into Markdown and persist it.
+
+        Parameters
+        ----------
+        overwrite : bool, default False
+            If ``False`` and ``self.markdown`` already exists, do nothing.
+
+        Returns
+        -------
+        django.db.models.fields.files.FieldFile
+            The stored ``markdown`` field.
+
+        Raises
+        ------
+        ValueError
+            If ``self.document`` is empty.
+        """
+        if self.markdown and not overwrite:
+            return self.markdown
+
+        if not self.document:
+            raise ValueError("No document available to convert")
+
+        converter = DocumentConverter()
+        result = converter.convert(self.document.path)
+        markdown_text = result.document.export_to_markdown()
+
+        filename = (
+            os.path.splitext(os.path.basename(self.document.name))[0] + ".md"
+        )
+
+        with transaction.atomic():
+            self.markdown.save(filename, ContentFile(markdown_text), save=False)
+            self.save(update_fields=["markdown"])
+
+        return self.markdown
 
     def get_metadata(self):
         raise NotImplementedError("Child class should implement get_metadata()")

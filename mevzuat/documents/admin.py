@@ -1,6 +1,5 @@
-from django.contrib import admin
-from django.utils.html import format_html
 from django.contrib import admin, messages
+from django.utils.html import format_html
 
 from .models import Mevzuat
 
@@ -42,7 +41,7 @@ class MevzuatAdmin(admin.ModelAdmin):
     )
     search_fields = ("mevzuat_no", "name")
     ordering = ("-resmi_gazete_tarihi", "-kabul_tarih")
-    actions = ("fetch_selected_documents",)
+    actions = ("fetch_selected_documents", "convert_selected_to_markdown",)
 
     @admin.display(boolean=True, description="Has document?", ordering="document")
     def has_document(self, obj: Mevzuat) -> bool:
@@ -52,7 +51,11 @@ class MevzuatAdmin(admin.ModelAdmin):
     def fetch_selected_documents(self, request, queryset):
         ok, failed = 0, 0
         for obj in queryset:
-            obj.fetch_and_store_document(overwrite=False)
+            try:
+                obj.fetch_and_store_document(overwrite=False)
+                ok += 1
+            except Exception:
+                failed += 1
 
         if ok:
             self.message_user(
@@ -64,6 +67,28 @@ class MevzuatAdmin(admin.ModelAdmin):
             self.message_user(
                 request,
                 f"{failed} document(s) could not be fetched – see log.",
+                level=messages.WARNING,
+            )
+
+    @admin.action(description="Convert stored PDF to Markdown for selected Mevzuat")
+    def convert_selected_to_markdown(self, request, queryset):
+        ok, failed = 0, 0
+        for obj in queryset:
+            try:
+                obj.convert_pdf_to_markdown(overwrite=False)
+                ok += 1
+            except Exception:
+                failed += 1
+        if ok:
+            self.message_user(
+                request,
+                f"Successfully converted {ok} document(s).",
+                level=messages.SUCCESS,
+            )
+        if failed:
+            self.message_user(
+                request,
+                f"{failed} document(s) could not be converted – see log.",
                 level=messages.WARNING,
             )
 
