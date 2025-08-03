@@ -10,6 +10,7 @@ import {
   XAxis,
 } from "recharts"
 
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer, ChartConfig, ChartTooltipContent } from "@/components/ui/chart"
 
@@ -21,6 +22,7 @@ interface CountsResponse {
 export default function DocumentsChart() {
   const [data, setData] = useState<CountsResponse[]>([])
   const [config, setConfig] = useState<ChartConfig>({})
+  const [stacked, setStacked] = useState(false)
 
   useEffect(() => {
     fetch("/api/documents/counts")
@@ -53,8 +55,15 @@ export default function DocumentsChart() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Documents by Type over Time</CardTitle>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setStacked((prev) => !prev)}
+        >
+          {stacked ? "Clustered" : "Stacked"}
+        </Button>
       </CardHeader>
       <CardContent>
         <ChartContainer config={config}>
@@ -64,7 +73,12 @@ export default function DocumentsChart() {
               <XAxis dataKey="year" tickLine={false} />
               <Tooltip content={<ChartTooltipContent />} />
               {Object.keys(config).map((key) => (
-                <Bar key={key} dataKey={key} fill={`var(--color-${key})`} />
+                <Bar
+                  key={key}
+                  dataKey={key}
+                  fill={`var(--color-${key})`}
+                  {...(stacked ? { stackId: "a" } : {})}
+                />
               ))}
             </BarChart>
           </ResponsiveContainer>
