@@ -27,7 +27,15 @@ export default function DocumentsChart() {
       .then((res) => res.json())
       .then((data: CountsResponse[]) => {
         setData(data)
-        const types = Object.keys(data[0] || {}).filter((k) => k !== "year")
+        const typeSet = new Set<string>()
+        data.forEach((item) => {
+          Object.keys(item).forEach((key) => {
+            if (key !== "year") {
+              typeSet.add(key)
+            }
+          })
+        })
+        const types = Array.from(typeSet)
         const colors = [
           "var(--chart-1)",
           "var(--chart-2)",
