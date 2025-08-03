@@ -1,8 +1,12 @@
-from typing import Optional
+from typing import Optional, Any
 
 from django.conf import settings
+from django.db.models import Count
+from django.db.models.functions import ExtractYear
 from ninja import Router, Schema
 from openai import OpenAI
+
+from .models import Mevzuat
 
 
 router = Router()
@@ -46,4 +50,26 @@ def list_vector_stores(request):
     return [
         {"name": name, "id": vs_id}
         for name, vs_id in settings.VECTORSTORES.items()
+    ]
+
+
+@router.get("/counts")
+def document_counts(request) -> list[dict[str, Any]]:
+    """Return document counts grouped by year and type."""
+
+    qs = (
+        Mevzuat.objects.exclude(resmi_gazete_tarihi__isnull=True)
+        .annotate(year=ExtractYear("resmi_gazete_tarihi"))
+        .values("year", "mevzuat_tur")
+        .annotate(count=Count("id"))
+        .order_by("year", "mevzuat_tur")
+    )
+    label_map = dict(Mevzuat._meta.get_field("mevzuat_tur").choices)
+    result: dict[int, dict[str, int]] = {}
+    for row in qs:
+        year = row["year"]
+        label = label_map.get(row["mevzuat_tur"], str(row["mevzuat_tur"]))
+        result.setdefault(year, {})[label] = row["count"]
+    return [
+        {"year": year, **counts} for year, counts in sorted(result.items())
     ]
