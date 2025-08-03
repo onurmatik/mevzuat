@@ -22,7 +22,7 @@ def document_upload_to(instance, filename):
 
 class Document(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4)
-    document = models.FileField(upload_to=document_upload_to)
+    document = models.FileField(upload_to=document_upload_to, blank=True, null=True)
     markdown = models.FileField(upload_to=document_upload_to, blank=True, null=True)
     oai_file_id = models.CharField(max_length=100, blank=True, null=True)
     embedding = VectorField(dimensions=1536, blank=True, null=True)

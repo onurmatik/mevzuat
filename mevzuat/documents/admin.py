@@ -1,7 +1,7 @@
 from django.contrib import admin, messages
 from django.utils.html import format_html
 
-from .models import Document, Mevzuat
+from .models import Mevzuat
 
 
 class HasDocumentFilter(admin.SimpleListFilter):
@@ -45,15 +45,15 @@ class MevzuatAdmin(admin.ModelAdmin):
     )
 
     @admin.display(boolean=True, description="Has pdf?", ordering="document")
-    def has_pdf(self, obj: Document) -> bool:
+    def has_pdf(self, obj: Mevzuat) -> bool:
         return bool(obj.document)
 
     @admin.display(boolean=True, description="Has md?")
-    def has_md(self, obj: Document) -> bool:
+    def has_md(self, obj: Mevzuat) -> bool:
         return bool(obj.markdown)
 
     @admin.display(boolean=True, description="In VS?")
-    def in_vs(self, obj: Document) -> bool:
+    def in_vs(self, obj: Mevzuat) -> bool:
         return bool(obj.oai_file_id)
 
     @admin.action(description="Fetch and attach PDF for selected Mevzuat")
