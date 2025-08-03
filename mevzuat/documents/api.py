@@ -72,6 +72,8 @@ def document_counts(request) -> list[dict[str, Any]]:
 
     qs = (
         Mevzuat.objects.exclude(resmi_gazete_tarihi__isnull=True)
+        .filter(resmi_gazete_tarihi__year__gte=2000)
+        .filter(mevzuat_tur__in=[1, 4, 19, 20, 21, 22])
         .annotate(year=ExtractYear("resmi_gazete_tarihi"))
         .values("year", "mevzuat_tur")
         .annotate(count=Count("id"))

@@ -207,18 +207,19 @@ class Mevzuat(Document):
     mevzuat_tur = models.PositiveSmallIntegerField(
         choices=(
             (1, "Kanun"),
-            (19, "Cumhurbaşkanlığı Kararnamesi"),
-            (21, "Cumhurbaşkanlığı Yönetmeliği"),
-            (20, "Cumhurbaşkanı Kararı"),
-            (22, "Cumhurbaşkanlığı Genelgesi"),
             (4, "KHK"),
-            (2, "Tüzük"),
-            (17, "İç Tüzük"),
-            (6, "Tüzük (?)"),
-            (7, "Kurum Yönetmeliği"),
-            (8, "Kurum Yönetmeliği (Üniversite)"),
-            (9, "Tebliğ"),
-        )
+            (19, "Cumhurbaşkanlığı Kararnamesi"),
+            (20, "Cumhurbaşkanı Kararı"),
+            (21, "Cumhurbaşkanlığı Yönetmeliği"),
+            (22, "Cumhurbaşkanlığı Genelgesi"),
+#            (2, "Tüzük"),
+#            (17, "İç Tüzük"),
+#            (6, "Tüzük (?)"),
+#            (7, "Kurum Yönetmeliği"),
+#            (8, "Kurum Yönetmeliği (Üniversite)"),
+#            (9, "Tebliğ"),
+#            (0, "Eski kanun"),
+        ), db_index=True,
     )
     mevzuat_no = models.CharField(max_length=16)
     mevzuat_tertib = models.PositiveSmallIntegerField()
