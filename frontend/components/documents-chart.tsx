@@ -46,15 +46,26 @@ export default function DocumentsChart() {
   const [selected, setSelected] = useState<{ year: number; type: string } | null>(
     null,
   )
+  const [error, setError] = useState<string | null>(null)
 
   const handleSelect = useCallback(async (year: number, type: string) => {
     const typeId = typeLabelToId[type]
     if (!typeId) return
-    const res = await fetch(
-      `/api/documents?year=${year}&mevzuat_tur=${typeId}`,
-    )
-    const docs: Document[] = await res.json()
-    setDocuments(docs)
+    try {
+      const res = await fetch(
+        `/api/documents/?year=${year}&mevzuat_tur=${typeId}`,
+      )
+      if (!res.ok) {
+        throw new Error(`Request failed: ${res.status}`)
+      }
+      const docs: Document[] = await res.json()
+      setDocuments(docs)
+      setError(null)
+    } catch (err) {
+      console.error(err)
+      setDocuments([])
+      setError("Failed to fetch documents")
+    }
     setSelected({ year, type })
   }, [])
 
@@ -176,7 +187,9 @@ export default function DocumentsChart() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {documents.length ? (
+            {error ? (
+              <div>{error}</div>
+            ) : documents.length ? (
               <ul className="list-disc pl-4">
                 {documents.map((doc) => (
                   <li key={doc.id}>{doc.name}</li>
