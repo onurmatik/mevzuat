@@ -1,4 +1,5 @@
 from typing import Optional, Any
+from datetime import date
 
 from django.conf import settings
 from django.db.models import Count
@@ -24,6 +25,18 @@ class VectorSearchPayload(Schema):
     limit: int = 10
     score_threshold: Optional[float] = None
     rewrite_query: bool = True
+
+
+class MevzuatOut(Schema):
+    """Schema representing a mevzuat document."""
+
+    id: int
+    name: str
+    mevzuat_tur: int
+    resmi_gazete_tarihi: Optional[date]
+
+    class Config:
+        from_attributes = True
 
 
 @router.post("/vector-stores/{vs_id}/search")
@@ -73,3 +86,15 @@ def document_counts(request) -> list[dict[str, Any]]:
     return [
         {"year": year, **counts} for year, counts in sorted(result.items())
     ]
+
+
+@router.get("/", response=list[MevzuatOut])
+def list_documents(request, mevzuat_tur: Optional[int] = None, year: Optional[int] = None):
+    """Return documents filtered by type and/or publication year."""
+
+    qs = Mevzuat.objects.all()
+    if mevzuat_tur is not None:
+        qs = qs.filter(mevzuat_tur=mevzuat_tur)
+    if year is not None:
+        qs = qs.filter(resmi_gazete_tarihi__year=year)
+    return qs
