@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useCallback } from "react"
 import {
   Bar,
   BarChart,
@@ -17,6 +17,22 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer, ChartConfig } from "@/components/ui/chart"
 
+interface Document {
+  id: number
+  name: string
+  mevzuat_tur: number
+  resmi_gazete_tarihi?: string
+}
+
+const typeLabelToId: Record<string, number> = {
+  Kanun: 1,
+  KHK: 4,
+  "Cumhurbaşkanlığı Kararnamesi": 19,
+  "Cumhurbaşkanı Kararı": 20,
+  "Cumhurbaşkanlığı Yönetmeliği": 21,
+  "Cumhurbaşkanlığı Genelgesi": 22,
+}
+
 interface CountsResponse {
   year: number
   [key: string]: number | string
@@ -26,6 +42,21 @@ export default function DocumentsChart() {
   const [data, setData] = useState<CountsResponse[]>([])
   const [config, setConfig] = useState<ChartConfig>({})
   const [stacked, setStacked] = useState(false)
+  const [documents, setDocuments] = useState<Document[]>([])
+  const [selected, setSelected] = useState<{ year: number; type: string } | null>(
+    null,
+  )
+
+  const handleSelect = useCallback(async (year: number, type: string) => {
+    const typeId = typeLabelToId[type]
+    if (!typeId) return
+    const res = await fetch(
+      `/api/documents?year=${year}&mevzuat_tur=${typeId}`,
+    )
+    const docs: Document[] = await res.json()
+    setDocuments(docs)
+    setSelected({ year, type })
+  }, [])
 
   /* -------------------------------------------------------------------------- */
   /*                                   FETCH                                    */
@@ -82,7 +113,11 @@ export default function DocumentsChart() {
               const color = config[key]?.color || p.color || "currentColor"
               const docLabel = config[key]?.label ?? key
               return (
-                <div key={key} className="flex items-center gap-2 whitespace-nowrap">
+                <div
+                  key={key}
+                  className="flex items-center gap-2 whitespace-nowrap cursor-pointer"
+                  onClick={() => handleSelect(Number(label), docLabel)}
+                >
                   <span
                     className="inline-block h-2 w-2 rounded-sm"
                     style={{ background: color }}
@@ -96,7 +131,7 @@ export default function DocumentsChart() {
         </div>
       )
     }
-  }, [config])
+  }, [config, handleSelect])
 
   /* -------------------------------------------------------------------------- */
   /*                                  RENDER                                    */
@@ -126,12 +161,33 @@ export default function DocumentsChart() {
                   fill={color}
                   isAnimationActive={false}
                   {...(stacked ? { stackId: "docs" } : {})}
+                  onClick={(data: any) => handleSelect(data.year, key)}
                 />
               ))}
             </BarChart>
           </ResponsiveContainer>
         </ChartContainer>
       </CardContent>
+      {selected && (
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle>
+              {selected.type} ({selected.year})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {documents.length ? (
+              <ul className="list-disc pl-4">
+                {documents.map((doc) => (
+                  <li key={doc.id}>{doc.name}</li>
+                ))}
+              </ul>
+            ) : (
+              <div>No documents found.</div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </Card>
   )
 }
