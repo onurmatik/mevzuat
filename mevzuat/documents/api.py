@@ -90,7 +90,7 @@ def document_counts(request) -> list[dict[str, Any]]:
     ]
 
 
-@router.get("/", response=list[MevzuatOut])
+@router.get("/list", response=list[MevzuatOut])
 def list_documents(request, mevzuat_tur: Optional[int] = None, year: Optional[int] = None):
     """Return documents filtered by type and/or publication year."""
 

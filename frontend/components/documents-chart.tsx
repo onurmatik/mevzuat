@@ -50,10 +50,14 @@ export default function DocumentsChart() {
 
   const handleSelect = useCallback(async (year: number, type: string) => {
     const typeId = typeLabelToId[type]
-    if (!typeId) return
+    if (!typeId || !year) return
     try {
+      const params = new URLSearchParams({
+        year: String(year),
+        mevzuat_tur: String(typeId),
+      })
       const res = await fetch(
-        `/api/documents/?year=${year}&mevzuat_tur=${typeId}`,
+        `/api/documents/list?${params.toString()}`,
       )
       if (!res.ok) {
         throw new Error(`Request failed: ${res.status}`)
@@ -172,7 +176,9 @@ export default function DocumentsChart() {
                   fill={color}
                   isAnimationActive={false}
                   {...(stacked ? { stackId: "docs" } : {})}
-                  onClick={(data: any) => handleSelect(data.year, key)}
+                  onClick={({ payload }: any) =>
+                    handleSelect(Number(payload?.year), key)
+                  }
                 />
               ))}
             </BarChart>
