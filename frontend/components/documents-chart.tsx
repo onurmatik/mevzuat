@@ -41,12 +41,16 @@ interface CountsResponse {
 export default function DocumentsChart() {
   const [data, setData] = useState<CountsResponse[]>([])
   const [config, setConfig] = useState<ChartConfig>({})
+  const [visible, setVisible] = useState<Record<string, boolean>>({})
   const [stacked, setStacked] = useState(false)
   const [documents, setDocuments] = useState<Document[]>([])
   const [selected, setSelected] = useState<{ year: number; type: string } | null>(
     null,
   )
   const [error, setError] = useState<string | null>(null)
+
+  const handleToggle = (key: string) =>
+    setVisible((p) => ({ ...p, [key]: !p[key] }))
 
   const handleSelect = useCallback(async (year: number, type: string) => {
     const typeId = typeLabelToId[type]
@@ -103,10 +107,13 @@ export default function DocumentsChart() {
         ]
 
         const cfg: ChartConfig = {}
+        const visibility: Record<string, boolean> = {}
         types.forEach((t, idx) => {
           cfg[t] = { label: t, color: palette[idx % palette.length] }
+          visibility[t] = true
         })
         setConfig(cfg)
+        setVisible(visibility)
       })
   }, [])
 
@@ -160,7 +167,24 @@ export default function DocumentsChart() {
         </Button>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap gap-4">
+          {Object.entries(config).map(([key, { label, color }]) => (
+            <label key={key} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={visible[key] ?? true}
+                onChange={() => handleToggle(key)}
+                className="rounded border-gray-300"
+              />
+              <span
+                className="inline-block h-2 w-2 rounded-sm"
+                style={{ background: color }}
+              />
+              {label}
+            </label>
+          ))}
+        </div>
         <ChartContainer config={config}>
           <ResponsiveContainer width="100%" height={350}>
             <BarChart data={data}>
@@ -169,18 +193,20 @@ export default function DocumentsChart() {
               <YAxis tickLine={false} />
               <Tooltip content={renderTooltip} />
 
-              {Object.entries(config).map(([key, { color }]) => (
-                <Bar
-                  key={key}
-                  dataKey={key}
-                  fill={color}
-                  isAnimationActive={false}
-                  {...(stacked ? { stackId: "docs" } : {})}
-                  onClick={({ payload }: any) =>
-                    handleSelect(Number(payload?.year), key)
-                  }
-                />
-              ))}
+              {Object.entries(config)
+                .filter(([key]) => visible[key] !== false)
+                .map(([key, { color }]) => (
+                  <Bar
+                    key={key}
+                    dataKey={key}
+                    fill={color}
+                    isAnimationActive={false}
+                    {...(stacked ? { stackId: "docs" } : {})}
+                    onClick={({ payload }: any) =>
+                      handleSelect(Number(payload?.year), key)
+                    }
+                  />
+                ))}
             </BarChart>
           </ResponsiveContainer>
         </ChartContainer>
