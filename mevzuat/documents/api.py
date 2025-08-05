@@ -2,7 +2,7 @@ from typing import Optional, Any
 from datetime import date
 
 from django.conf import settings
-from django.db.models import Count
+from django.db.models import Count, Min
 from django.db.models.functions import ExtractYear
 from ninja import Router, Schema
 from openai import OpenAI
@@ -75,8 +75,8 @@ def document_counts(
 ) -> list[dict[str, Any]]:
     """Return document counts grouped by a time interval and type.
 
-    If ``start_date`` and ``end_date`` are not provided, the last 30 days are
-    used and results are grouped daily. ``interval`` may be one of
+    If ``start_date`` is not provided, the earliest available publication date
+    is used. ``end_date`` defaults to today. ``interval`` may be one of
     ``"day"``, ``"month"`` or ``"year"``.
     """
 
@@ -86,7 +86,12 @@ def document_counts(
     if end_date is None:
         end_date = date.today()
     if start_date is None:
-        start_date = end_date - timedelta(days=30)
+        earliest = (
+            Mevzuat.objects.exclude(resmi_gazete_tarihi__isnull=True)
+            .aggregate(Min("resmi_gazete_tarihi"))
+            .get("resmi_gazete_tarihi__min")
+        )
+        start_date = earliest or (end_date - timedelta(days=30))
 
     qs = (
         Mevzuat.objects.exclude(resmi_gazete_tarihi__isnull=True)
