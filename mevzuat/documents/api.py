@@ -90,13 +90,31 @@ def document_counts(request) -> list[dict[str, Any]]:
     ]
 
 
-@router.get("/list", response=list[MevzuatOut])
-def list_documents(request, mevzuat_tur: Optional[int] = None, year: Optional[int] = None):
-    """Return documents filtered by type and/or publication year."""
+@router.get("/", response=list[MevzuatOut])
+def list_documents(
+    request,
+    mevzuat_tur: Optional[int] = None,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    date: Optional[date] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+):
+    """Return documents filtered by type and/or publication date."""
 
     qs = Mevzuat.objects.all()
     if mevzuat_tur is not None:
         qs = qs.filter(mevzuat_tur=mevzuat_tur)
     if year is not None:
         qs = qs.filter(resmi_gazete_tarihi__year=year)
+    if month is not None:
+        qs = qs.filter(resmi_gazete_tarihi__month=month)
+    if date is not None:
+        qs = qs.filter(resmi_gazete_tarihi=date)
+    if start_date is not None and end_date is not None:
+        qs = qs.filter(resmi_gazete_tarihi__range=(start_date, end_date))
+    elif start_date is not None:
+        qs = qs.filter(resmi_gazete_tarihi__gte=start_date)
+    elif end_date is not None:
+        qs = qs.filter(resmi_gazete_tarihi__lte=end_date)
     return qs
