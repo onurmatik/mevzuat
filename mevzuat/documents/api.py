@@ -67,27 +67,57 @@ def list_vector_stores(request):
 
 
 @router.get("/counts")
-def document_counts(request) -> list[dict[str, Any]]:
-    """Return document counts grouped by year and type."""
+def document_counts(
+    request,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    interval: str = "day",
+) -> list[dict[str, Any]]:
+    """Return document counts grouped by a time interval and type.
+
+    If ``start_date`` and ``end_date`` are not provided, the last 30 days are
+    used and results are grouped daily. ``interval`` may be one of
+    ``"day"``, ``"month"`` or ``"year"``.
+    """
+
+    from datetime import timedelta, datetime
+    from django.db.models.functions import TruncDay, TruncMonth
+
+    if end_date is None:
+        end_date = date.today()
+    if start_date is None:
+        start_date = end_date - timedelta(days=30)
 
     qs = (
         Mevzuat.objects.exclude(resmi_gazete_tarihi__isnull=True)
-        .filter(resmi_gazete_tarihi__year__gte=2000)
+        .filter(resmi_gazete_tarihi__range=(start_date, end_date))
         .filter(mevzuat_tur__in=[1, 4, 19, 20, 21, 22])
-        .annotate(year=ExtractYear("resmi_gazete_tarihi"))
-        .values("year", "mevzuat_tur")
-        .annotate(count=Count("id"))
-        .order_by("year", "mevzuat_tur")
     )
+
+    if interval == "month":
+        qs = qs.annotate(period=TruncMonth("resmi_gazete_tarihi"))
+    elif interval == "year":
+        qs = qs.annotate(period=ExtractYear("resmi_gazete_tarihi"))
+    else:
+        qs = qs.annotate(period=TruncDay("resmi_gazete_tarihi"))
+
+    qs = (
+        qs.values("period", "mevzuat_tur")
+        .annotate(count=Count("id"))
+        .order_by("period", "mevzuat_tur")
+    )
+
     label_map = dict(Mevzuat._meta.get_field("mevzuat_tur").choices)
-    result: dict[int, dict[str, int]] = {}
+    result: dict[str, dict[str, int]] = {}
     for row in qs:
-        year = row["year"]
+        period_val = row["period"]
+        if isinstance(period_val, (date, datetime)):
+            key = period_val.isoformat()
+        else:
+            key = str(period_val)
         label = label_map.get(row["mevzuat_tur"], str(row["mevzuat_tur"]))
-        result.setdefault(year, {})[label] = row["count"]
-    return [
-        {"year": year, **counts} for year, counts in sorted(result.items())
-    ]
+        result.setdefault(key, {})[label] = row["count"]
+    return [{"date": k, **counts} for k, counts in sorted(result.items())]
 
 
 @router.get("/", response=list[MevzuatOut])

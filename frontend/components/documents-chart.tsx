@@ -9,6 +9,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  Brush,
 } from "recharts"
 // 🔹 Use TooltipProps from the component’s type declarations so `payload` is recognised
 import type { TooltipProps } from "recharts/types/component/Tooltip"
@@ -34,7 +35,7 @@ const typeLabelToId: Record<string, number> = {
 }
 
 interface CountsResponse {
-  year: number
+  date: string
   [key: string]: number | string
 }
 
@@ -44,20 +45,21 @@ export default function DocumentsChart() {
   const [visible, setVisible] = useState<Record<string, boolean>>({})
   const [stacked, setStacked] = useState(false)
   const [documents, setDocuments] = useState<Document[]>([])
-  const [selected, setSelected] = useState<{ year: number; type: string } | null>(
+  const [selected, setSelected] = useState<{ date: string; type: string } | null>(
     null,
   )
   const [error, setError] = useState<string | null>(null)
+  const [range, setRange] = useState<[number, number]>([0, 0])
 
   const handleToggle = (key: string) =>
     setVisible((p) => ({ ...p, [key]: !p[key] }))
 
-  const handleSelect = useCallback(async (year: number, type: string) => {
+  const handleSelect = useCallback(async (date: string, type: string) => {
     const typeId = typeLabelToId[type]
-    if (!typeId || !year) return
+    if (!typeId || !date) return
     try {
       const params = new URLSearchParams({
-        year: String(year),
+        date,
         mevzuat_tur: String(typeId),
       })
       const res = await fetch(
@@ -74,8 +76,52 @@ export default function DocumentsChart() {
       setDocuments([])
       setError("Failed to fetch documents")
     }
-    setSelected({ year, type })
+    setSelected({ date, type })
   }, [])
+
+  const displayed = useMemo(
+    () => data.slice(range[0], range[1] + 1),
+    [data, range],
+  )
+
+  const zoomIn = () => {
+    const [start, end] = range
+    const span = end - start + 1
+    if (span <= 1) return
+    const mid = Math.floor((start + end) / 2)
+    const newSpan = Math.max(1, Math.floor(span / 2))
+    let newStart = Math.max(0, mid - Math.floor(newSpan / 2))
+    let newEnd = Math.min(data.length - 1, newStart + newSpan - 1)
+    setRange([newStart, newEnd])
+  }
+
+  const zoomOut = () => {
+    const [start, end] = range
+    const span = end - start + 1
+    const mid = Math.floor((start + end) / 2)
+    const newSpan = Math.min(data.length, span * 2)
+    let newStart = Math.max(0, mid - Math.floor(newSpan / 2))
+    let newEnd = Math.min(data.length - 1, newStart + newSpan - 1)
+    setRange([newStart, newEnd])
+  }
+
+  const panLeft = () => {
+    const [start, end] = range
+    const span = end - start
+    const step = Math.max(1, Math.floor(span / 4))
+    let newStart = Math.max(0, start - step)
+    let newEnd = newStart + span
+    setRange([newStart, newEnd])
+  }
+
+  const panRight = () => {
+    const [start, end] = range
+    const span = end - start
+    const step = Math.max(1, Math.floor(span / 4))
+    let newEnd = Math.min(data.length - 1, end + step)
+    let newStart = newEnd - span
+    setRange([newStart, newEnd])
+  }
 
   /* -------------------------------------------------------------------------- */
   /*                                   FETCH                                    */
@@ -84,12 +130,15 @@ export default function DocumentsChart() {
     fetch("/api/documents/counts")
       .then((res) => res.json())
       .then((raw: CountsResponse[]) => {
-        const sorted = [...raw].sort((a, b) => a.year - b.year)
+        const sorted = [...raw].sort((a, b) =>
+          a.date.localeCompare(b.date),
+        )
         setData(sorted)
+        setRange([Math.max(sorted.length - 30, 0), sorted.length - 1])
 
         const typeSet = new Set<string>()
         sorted.forEach((row) => {
-          Object.keys(row).forEach((k) => k !== "year" && typeSet.add(k))
+          Object.keys(row).forEach((k) => k !== "date" && typeSet.add(k))
         })
         const types = Array.from(typeSet)
 
@@ -138,7 +187,7 @@ export default function DocumentsChart() {
                 <div
                   key={key}
                   className="flex items-center gap-2 whitespace-nowrap cursor-pointer"
-                  onClick={() => handleSelect(Number(label), docLabel)}
+                  onClick={() => handleSelect(label, docLabel)}
                 >
                   <span
                     className="inline-block h-2 w-2 rounded-sm"
@@ -185,13 +234,42 @@ export default function DocumentsChart() {
             </label>
           ))}
         </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={zoomIn}>
+            Zoom In
+          </Button>
+          <Button variant="outline" size="sm" onClick={zoomOut}>
+            Zoom Out
+          </Button>
+          <Button variant="outline" size="sm" onClick={panLeft}>
+            ◀
+          </Button>
+          <Button variant="outline" size="sm" onClick={panRight}>
+            ▶
+          </Button>
+        </div>
         <ChartContainer config={config}>
           <ResponsiveContainer width="100%" height={350}>
-            <BarChart data={data}>
+            <BarChart data={displayed}>
               <CartesianGrid vertical={false} />
-              <XAxis dataKey="year" tickLine={false} />
+              <XAxis
+                dataKey="date"
+                tickLine={false}
+                tickFormatter={(value) => new Date(value).toLocaleDateString()}
+              />
               <YAxis tickLine={false} />
               <Tooltip content={renderTooltip} />
+              <Brush
+                dataKey="date"
+                data={data}
+                startIndex={range[0]}
+                endIndex={range[1]}
+                onChange={(e) =>
+                  e?.startIndex != null && e?.endIndex != null
+                    ? setRange([e.startIndex, e.endIndex])
+                    : null
+                }
+              />
 
               {Object.entries(config)
                 .filter(([key]) => visible[key] !== false)
@@ -203,7 +281,7 @@ export default function DocumentsChart() {
                     isAnimationActive={false}
                     {...(stacked ? { stackId: "docs" } : {})}
                     onClick={({ payload }: any) =>
-                      handleSelect(Number(payload?.year), key)
+                      handleSelect(payload?.date, key)
                     }
                   />
                 ))}
@@ -215,7 +293,7 @@ export default function DocumentsChart() {
         <Card className="mt-4">
           <CardHeader>
             <CardTitle>
-              {selected.type} ({selected.year})
+              {selected.type} ({selected.date})
             </CardTitle>
           </CardHeader>
           <CardContent>
