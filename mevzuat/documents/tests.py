@@ -64,3 +64,25 @@ class DocumentListAPITest(TestCase):
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0]["mevzuat_tur"], 1)
         self.assertTrue(data[0]["resmi_gazete_tarihi"].startswith("2021"))
+
+    def test_filter_by_month(self):
+        response = self.client.get("/api/documents/", {"month": 1})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data), 2)
+        self.assertTrue(all(item["resmi_gazete_tarihi"][5:7] == "01" for item in data))
+
+    def test_filter_by_date(self):
+        response = self.client.get("/api/documents/", {"date": "2021-05-05"})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["resmi_gazete_tarihi"], "2021-05-05")
+
+    def test_filter_by_date_range(self):
+        params = {"start_date": "2020-01-01", "end_date": "2021-04-30"}
+        response = self.client.get("/api/documents/", params)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data), 2)
+        self.assertTrue(all("2020-01-01" <= item["resmi_gazete_tarihi"] <= "2021-04-30" for item in data))
