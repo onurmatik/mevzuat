@@ -134,7 +134,12 @@ export default function DocumentsChart() {
           a.date.localeCompare(b.date),
         )
         setData(sorted)
-        setRange([Math.max(sorted.length - 30, 0), sorted.length - 1])
+
+        // Avoid negative indices when the dataset is empty which would cause
+        // NaN positioning values in Recharts components.
+        const end = Math.max(sorted.length - 1, 0)
+        const start = Math.max(end - 29, 0)
+        setRange([start, end])
 
         const typeSet = new Set<string>()
         sorted.forEach((row) => {
@@ -249,44 +254,50 @@ export default function DocumentsChart() {
           </Button>
         </div>
         <ChartContainer config={config}>
-          <ResponsiveContainer width="100%" height={350}>
-            <BarChart data={displayed}>
-              <CartesianGrid vertical={false} />
-              <XAxis
-                dataKey="date"
-                tickLine={false}
-                tickFormatter={(value) => new Date(value).toLocaleDateString()}
-              />
-              <YAxis tickLine={false} />
-              <Tooltip content={renderTooltip} />
-              <Brush
-                dataKey="date"
-                data={data}
-                startIndex={range[0]}
-                endIndex={range[1]}
-                onChange={(e) =>
-                  e?.startIndex != null && e?.endIndex != null
-                    ? setRange([e.startIndex, e.endIndex])
-                    : null
-                }
-              />
+          {displayed.length > 0 ? (
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart data={displayed}>
+                <CartesianGrid vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tickLine={false}
+                  tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                />
+                <YAxis tickLine={false} />
+                <Tooltip content={renderTooltip} />
+                <Brush
+                  dataKey="date"
+                  data={data}
+                  startIndex={range[0]}
+                  endIndex={range[1]}
+                  onChange={(e) =>
+                    e?.startIndex != null && e?.endIndex != null
+                      ? setRange([e.startIndex, e.endIndex])
+                      : null
+                  }
+                />
 
-              {Object.entries(config)
-                .filter(([key]) => visible[key] !== false)
-                .map(([key, { color }]) => (
-                  <Bar
-                    key={key}
-                    dataKey={key}
-                    fill={color}
-                    isAnimationActive={false}
-                    {...(stacked ? { stackId: "docs" } : {})}
-                    onClick={({ payload }: any) =>
-                      handleSelect(payload?.date, key)
-                    }
-                  />
-                ))}
-            </BarChart>
-          </ResponsiveContainer>
+                {Object.entries(config)
+                  .filter(([key]) => visible[key] !== false)
+                  .map(([key, { color }]) => (
+                    <Bar
+                      key={key}
+                      dataKey={key}
+                      fill={color}
+                      isAnimationActive={false}
+                      {...(stacked ? { stackId: "docs" } : {})}
+                      onClick={({ payload }: any) =>
+                        handleSelect(payload?.date, key)
+                      }
+                    />
+                  ))}
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex h-[350px] items-center justify-center text-sm text-muted-foreground">
+              No data
+            </div>
+          )}
         </ChartContainer>
       </CardContent>
       {selected && (
