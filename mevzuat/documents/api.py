@@ -7,7 +7,7 @@ from django.db.models.functions import ExtractYear
 from ninja import Router, Schema
 from openai import OpenAI
 
-from .models import Mevzuat
+from .models import Document
 
 
 router = Router()
@@ -27,8 +27,8 @@ class VectorSearchPayload(Schema):
     rewrite_query: bool = True
 
 
-class MevzuatOut(Schema):
-    """Schema representing a mevzuat document."""
+class DocumentOut(Schema):
+    """Schema representing a document."""
 
     id: int
     name: str
@@ -87,14 +87,14 @@ def document_counts(
         end_date = date.today()
     if start_date is None:
         earliest = (
-            Mevzuat.objects.exclude(resmi_gazete_tarihi__isnull=True)
+            Document.objects.exclude(resmi_gazete_tarihi__isnull=True)
             .aggregate(Min("resmi_gazete_tarihi"))
             .get("resmi_gazete_tarihi__min")
         )
         start_date = earliest or (end_date - timedelta(days=30))
 
     qs = (
-        Mevzuat.objects.exclude(resmi_gazete_tarihi__isnull=True)
+        Document.objects.exclude(resmi_gazete_tarihi__isnull=True)
         .filter(resmi_gazete_tarihi__range=(start_date, end_date))
         .filter(mevzuat_tur__in=[1, 4, 19, 20, 21, 22])
     )
@@ -112,7 +112,7 @@ def document_counts(
         .order_by("period", "mevzuat_tur")
     )
 
-    label_map = dict(Mevzuat._meta.get_field("mevzuat_tur").choices)
+    label_map = dict(Document._meta.get_field("mevzuat_tur").choices)
     result: dict[str, dict[str, int]] = {}
     for row in qs:
         period_val = row["period"]
@@ -125,7 +125,7 @@ def document_counts(
     return [{"date": k, **counts} for k, counts in sorted(result.items())]
 
 
-@router.get("/", response=list[MevzuatOut])
+@router.get("/", response=list[DocumentOut])
 def list_documents(
     request,
     mevzuat_tur: Optional[int] = None,
@@ -137,7 +137,7 @@ def list_documents(
 ):
     """Return documents filtered by type and/or publication date."""
 
-    qs = Mevzuat.objects.all()
+    qs = Document.objects.all()
     if mevzuat_tur is not None:
         qs = qs.filter(mevzuat_tur=mevzuat_tur)
     if year is not None:

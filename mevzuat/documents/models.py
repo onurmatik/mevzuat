@@ -1,36 +1,72 @@
 import uuid
-import os
-from urllib.parse import urlparse
-import requests
+from functools import cached_property
+from django.core.exceptions import ValidationError
 
+from pgvector.django import VectorField, L2Distance, HnswIndex, HalfVectorField
 from django.db import models
 from django.conf import settings
-from django.core.files.base import ContentFile
-from django.db import transaction
-from django.utils.translation import gettext_lazy as _
-from pgvector.django import VectorField, L2Distance, HnswIndex, HalfVectorField
-from docling.document_converter import DocumentConverter
+from slugify import slugify
+
+
+class VectorStore(models.Model):
+    uuid = models.UUIDField(default=uuid.uuid4)
+    name = models.CharField(max_length=100, unique=True)
+    oai_vs_id = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
+
+class DocumentType(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    slug = models.SlugField(unique=True, blank=True)
+    description = models.TextField(blank=True)
+    default_vector_store = models.ForeignKey(
+        VectorStore, on_delete=models.SET_NULL,
+        null=True, blank=True
+    )
+    fetcher = models.CharField(max_length=50, blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        from .fetchers import _registry
+        if self.fetcher not in _registry:
+            raise ValidationError({"fetcher": "Unknown fetcher class"})
+
+    @cached_property
+    def document_count(self):
+        return self.documents.count()
 
 
 def document_upload_to(instance, filename):
-    """
-    Calls the concrete model’s get_document_upload_to().
-    Needs to be importable so Django can serialize it in migrations.
-    """
-    return instance.get_document_upload_to(filename)
+    # Upload path for the original doc and its markdown version
+    return f"docs/{instance.type.slug}/{instance.document_date.year}/{filename}"
 
 
 class Document(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4)
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False)
+    type = models.ForeignKey(DocumentType, on_delete=models.SET_NULL, null=True, blank=True, related_name='documents')
+
+    title = models.CharField(max_length=300)
+
     document = models.FileField(upload_to=document_upload_to, blank=True, null=True)
     markdown = models.FileField(upload_to=document_upload_to, blank=True, null=True)
+
     oai_file_id = models.CharField(max_length=100, blank=True, null=True)
     embedding = VectorField(dimensions=1536, blank=True, null=True)
-
+    metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        abstract = True
+        """
         indexes = [
             HnswIndex(
                 name='topiccontent_embedding_hnsw',
@@ -40,145 +76,24 @@ class Document(models.Model):
                 opclasses=['vector_l2_ops']
             )
         ]
-
-    def fetch_and_store_document(self, *, overwrite: bool = False, timeout: int = 30) -> "models.FileField":
         """
-        Download the PDF at ``self.original_document_url()`` and save it into
-        ``self.document``.
 
-        Parameters
-        ----------
-        overwrite : bool, default False
-            If ``False`` and ``self.document`` already exists, do nothing.
-        timeout : int, default 30
-            Seconds to wait for the HTTP response.
+    def _fetcher(self):
+        from .fetchers import get
+        return get(self.type.fetcher)
 
-        Returns
-        -------
-        django.db.models.fields.files.FieldFile
-            The stored ``document`` field (convenient to access ``.url``, ``.path``).
+    @cached_property
+    def document_date(self):
+        return self._fetcher().get_document_date(self)
 
-        Raises
-        ------
-        requests.RequestException
-            On any network / HTTP error. Callers can catch and handle.
-        """
-        # Skip unless we need to fetch (honouring the overwrite flag)
-        if self.document and not overwrite:
-            return self.document
+    @cached_property
+    def original_document_url(self):
+        return self._fetcher().build_original_url(self)
 
-        pdf_url = self.original_document_url()
-        if not pdf_url:
-            raise ValueError("original_document_url() returned an empty URL")
-
-        default_headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/125.0.0.0 Safari/537.36"
-            ),
-            "Accept": "application/pdf,application/octet-stream;q=0.9,*/*;q=0.8",
-            "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Referer": "https://www.mevzuat.gov.tr/",
-            "Connection": "keep-alive",
-        }
-
-        response = requests.get(pdf_url, headers=default_headers, timeout=timeout)
-        response.raise_for_status()  # will raise if status ≥ 400
-
-        # Derive a sensible filename, e.g. '1.5.7557.pdf'
-        filename = os.path.basename(urlparse(pdf_url).path) or f"{self.uuid}.pdf"
-
-        # Save inside a transaction so the DB row and the file write stay in sync
-        with transaction.atomic():
-            self.document.save(filename, ContentFile(response.content), save=False)
-            self.save(update_fields=["document"])
-
-        return self.document
-
-    def convert_pdf_to_markdown(self, *, overwrite: bool = False) -> "models.FileField":
-        """Convert the stored PDF into Markdown and persist it.
-
-        Parameters
-        ----------
-        overwrite : bool, default False
-            If ``False`` and ``self.markdown`` already exists, do nothing.
-
-        Returns
-        -------
-        django.db.models.fields.files.FieldFile
-            The stored ``markdown`` field.
-
-        Raises
-        ------
-        ValueError
-            If ``self.document`` is empty.
-        """
-        if self.markdown and not overwrite:
-            return self.markdown
-
-        if not self.document:
-            raise ValueError("No document available to convert")
-
-        converter = DocumentConverter()
-        result = converter.convert(self.document.path)
-        markdown_text = result.document.export_to_markdown()
-
-        filename = (
-            os.path.splitext(os.path.basename(self.document.name))[0] + ".md"
-        )
-
-        with transaction.atomic():
-            self.markdown.save(filename, ContentFile(markdown_text), save=False)
-            self.save(update_fields=["markdown"])
-
-        return self.markdown
-
-    def upload_to_vectorstore(self, client=None):
-        """Upload the document to the configured OpenAI vector store.
-
-        The file is first uploaded to OpenAI and then attached to the
-        vector store returned by :meth:`get_vectorstore_id`.
-
-        Parameters
-        ----------
-        client : openai.OpenAI, optional
-            An existing OpenAI client instance. If ``None`` a new client will
-            be created using default configuration.
-
-        Returns
-        -------
-        str
-            The uploaded OpenAI file id.
-
-        Raises
-        ------
-        ValueError
-            If ``self.document`` is empty.
-        """
-        if not self.document:
-            raise ValueError("No document available to upload")
-
-        # Import lazily so openai is only required when this method is used.
-        from openai import OpenAI
-
-        client = client or OpenAI()
-
-        # Upload the file to OpenAI first.
-        with open(self.document.path, "rb") as f:
-            uploaded_file = client.files.create(file=f, purpose="user_data")
-
-        self.oai_file_id = uploaded_file.id
-        self.save(update_fields=["oai_file_id"])
-
-        # Attach the uploaded file to the vector store.
-        vector_store_id = self.get_vectorstore_id()
-        client.vector_stores.files.create(
-            vector_store_id=vector_store_id,
-            file_id=uploaded_file.id,
-        )
-
-        return uploaded_file.id
+    def enrich_metadata(self, pdf_bytes=None):
+        extra = self._fetcher().extract_metadata(self)
+        merged = {**self.metadata, **(extra or {})}
+        return merged
 
     def get_vectorstore_id(self):
         """Return the vectorstore id for this document type.
@@ -197,61 +112,3 @@ class Document(models.Model):
 
     def get_document_upload_to(self, filename):
         raise NotImplementedError("Child class should implement get_document_upload_to()")
-
-
-class Mevzuat(Document):
-    """
-    Documents from mevzuat.gov.tr
-    """
-    name = models.CharField(max_length=600)
-    mevzuat_tur = models.PositiveSmallIntegerField(
-        choices=(
-            (1, "Kanun"),
-            (4, "KHK"),
-            (19, "Cumhurbaşkanlığı Kararnamesi"),
-            (20, "Cumhurbaşkanı Kararı"),
-            (21, "Cumhurbaşkanlığı Yönetmeliği"),
-            (22, "Cumhurbaşkanlığı Genelgesi"),
-#            (2, "Tüzük"),
-#            (17, "İç Tüzük"),
-#            (6, "Tüzük (?)"),
-#            (7, "Kurum Yönetmeliği"),
-#            (8, "Kurum Yönetmeliği (Üniversite)"),
-#            (9, "Tebliğ"),
-#            (0, "Eski kanun"),
-        ), db_index=True,
-    )
-    mevzuat_no = models.CharField(max_length=16)
-    mevzuat_tertib = models.PositiveSmallIntegerField()
-
-    kabul_tarih = models.DateField(null=True, blank=True)
-    resmi_gazete_tarihi = models.DateField(null=True, blank=True)
-    resmi_gazete_sayisi = models.CharField(max_length=16, null=True, blank=True)
-
-    nitelik = models.CharField(max_length=120, null=True, blank=True)
-    mukerrer = models.BooleanField(
-        default=False,
-        help_text=_("Whether this is a duplicate issue.")
-    )
-    tuzuk_mevzuat_tur = models.PositiveSmallIntegerField(default=0)
-    has_old_law = models.BooleanField(default=False)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=("mevzuat_tur", "mevzuat_tertib", "mevzuat_no", "resmi_gazete_tarihi"),
-                name="uniq_mevzuat_tur_tertip_no",
-            )
-        ]
-
-    def get_document_upload_to(self, filename):
-        return f"mevzuat/{self.mevzuat_tur:02d}/{filename}"
-
-    def original_document_url(self):
-        if self.mevzuat_tur == 22:
-            uri = f"CumhurbaskanligiGenelgeleri/{self.resmi_gazete_tarihi.strftime('%Y%m%d')}-{self.mevzuat_no}.pdf"
-        elif self.mevzuat_tur in [7, 8, 9]:
-            uri = f"yonetmelik/{self.mevzuat_tur}.{self.mevzuat_tertib}.{self.mevzuat_no}.pdf"
-        else:
-            uri = f"{self.mevzuat_tur}.{self.mevzuat_tertib}.{self.mevzuat_no}.pdf"
-        return f"https://www.mevzuat.gov.tr/MevzuatMetin/{uri}"
