@@ -2,8 +2,8 @@ from typing import Optional, Any
 from datetime import date
 
 from django.conf import settings
-from django.db.models import Count, Min
-from django.db.models.functions import ExtractYear
+from django.db.models import Count, Min, IntegerField, DateField
+from django.db.models.functions import ExtractYear, Cast, TruncDay, TruncMonth
 from ninja import Router, Schema
 from openai import OpenAI
 
@@ -31,12 +31,26 @@ class DocumentOut(Schema):
     """Schema representing a document."""
 
     id: int
-    name: str
+    title: str
     mevzuat_tur: int
-    resmi_gazete_tarihi: Optional[date]
+    document_date: Optional[date]
 
     class Config:
         from_attributes = True
+
+
+# Mapping of ``mevzuat_tur`` integer codes to their human readable labels.
+# These values were previously defined on the old ``Mevzuat`` model as
+# ``choices`` and are now represented here explicitly so the API continues to
+# return labelled data after the model refactor.
+MEVZUAT_TUR_LABELS: dict[int, str] = {
+    1: "Kanun",
+    4: "KHK",
+    19: "Cumhurbaşkanlığı Kararnamesi",
+    20: "Cumhurbaşkanı Kararı",
+    21: "Cumhurbaşkanlığı Yönetmeliği",
+    22: "Cumhurbaşkanlığı Genelgesi",
+}
 
 
 @router.post("/vector-stores/{vs_id}/search")
@@ -81,30 +95,34 @@ def document_counts(
     """
 
     from datetime import timedelta, datetime
-    from django.db.models.functions import TruncDay, TruncMonth
 
     if end_date is None:
         end_date = date.today()
     if start_date is None:
         earliest = (
-            Document.objects.exclude(resmi_gazete_tarihi__isnull=True)
-            .aggregate(Min("resmi_gazete_tarihi"))
-            .get("resmi_gazete_tarihi__min")
+            Document.objects.exclude(metadata__resmi_gazete_tarihi__isnull=True)
+            .annotate(rg_date=Cast("metadata__resmi_gazete_tarihi", DateField()))
+            .aggregate(Min("rg_date"))
+            .get("rg_date__min")
         )
         start_date = earliest or (end_date - timedelta(days=30))
 
     qs = (
-        Document.objects.exclude(resmi_gazete_tarihi__isnull=True)
-        .filter(resmi_gazete_tarihi__range=(start_date, end_date))
-        .filter(mevzuat_tur__in=[1, 4, 19, 20, 21, 22])
+        Document.objects.exclude(metadata__resmi_gazete_tarihi__isnull=True)
+        .annotate(
+            mevzuat_tur=Cast("metadata__mevzuat_tur", IntegerField()),
+            rg_date=Cast("metadata__resmi_gazete_tarihi", DateField()),
+        )
+        .filter(rg_date__range=(start_date, end_date))
+        .filter(mevzuat_tur__in=MEVZUAT_TUR_LABELS.keys())
     )
 
     if interval == "month":
-        qs = qs.annotate(period=TruncMonth("resmi_gazete_tarihi"))
+        qs = qs.annotate(period=TruncMonth("rg_date"))
     elif interval == "year":
-        qs = qs.annotate(period=ExtractYear("resmi_gazete_tarihi"))
+        qs = qs.annotate(period=ExtractYear("rg_date"))
     else:
-        qs = qs.annotate(period=TruncDay("resmi_gazete_tarihi"))
+        qs = qs.annotate(period=TruncDay("rg_date"))
 
     qs = (
         qs.values("period", "mevzuat_tur")
@@ -112,7 +130,6 @@ def document_counts(
         .order_by("period", "mevzuat_tur")
     )
 
-    label_map = dict(Document._meta.get_field("mevzuat_tur").choices)
     result: dict[str, dict[str, int]] = {}
     for row in qs:
         period_val = row["period"]
@@ -120,7 +137,7 @@ def document_counts(
             key = period_val.isoformat()
         else:
             key = str(period_val)
-        label = label_map.get(row["mevzuat_tur"], str(row["mevzuat_tur"]))
+        label = MEVZUAT_TUR_LABELS.get(row["mevzuat_tur"], str(row["mevzuat_tur"]))
         result.setdefault(key, {})[label] = row["count"]
     return [{"date": k, **counts} for k, counts in sorted(result.items())]
 
@@ -137,19 +154,22 @@ def list_documents(
 ):
     """Return documents filtered by type and/or publication date."""
 
-    qs = Document.objects.all()
+    qs = Document.objects.annotate(
+        mevzuat_tur=Cast("metadata__mevzuat_tur", IntegerField()),
+        document_date=Cast("metadata__resmi_gazete_tarihi", DateField()),
+    )
     if mevzuat_tur is not None:
         qs = qs.filter(mevzuat_tur=mevzuat_tur)
     if year is not None:
-        qs = qs.filter(resmi_gazete_tarihi__year=year)
+        qs = qs.filter(document_date__year=year)
     if month is not None:
-        qs = qs.filter(resmi_gazete_tarihi__month=month)
+        qs = qs.filter(document_date__month=month)
     if date is not None:
-        qs = qs.filter(resmi_gazete_tarihi=date)
+        qs = qs.filter(document_date=date)
     if start_date is not None and end_date is not None:
-        qs = qs.filter(resmi_gazete_tarihi__range=(start_date, end_date))
+        qs = qs.filter(document_date__range=(start_date, end_date))
     elif start_date is not None:
-        qs = qs.filter(resmi_gazete_tarihi__gte=start_date)
+        qs = qs.filter(document_date__gte=start_date)
     elif end_date is not None:
-        qs = qs.filter(resmi_gazete_tarihi__lte=end_date)
+        qs = qs.filter(document_date__lte=end_date)
     return qs
