@@ -3,3 +3,4 @@ pgvector
 docling
 openai
 django-ninja
+mcp
