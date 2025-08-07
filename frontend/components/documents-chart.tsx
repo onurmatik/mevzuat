@@ -25,15 +25,6 @@ interface Document {
   date?: string
 }
 
-const typeLabelToId: Record<string, number> = {
-  Kanun: 1,
-  KHK: 4,
-  "Cumhurbaşkanlığı Kararnamesi": 19,
-  "Cumhurbaşkanı Kararı": 20,
-  "Cumhurbaşkanlığı Yönetmeliği": 21,
-  "Cumhurbaşkanlığı Genelgesi": 22,
-}
-
 interface RawCount {
   period: string
   type: string
@@ -56,34 +47,36 @@ export default function DocumentsChart() {
   )
   const [error, setError] = useState<string | null>(null)
   const [range, setRange] = useState<[number, number]>([0, 0])
+  const [typeLabelToId, setTypeLabelToId] = useState<Record<string, number>>({})
 
   const handleToggle = (key: string) =>
     setVisible((p) => ({ ...p, [key]: !p[key] }))
 
-  const handleSelect = useCallback(async (date: string, type: string) => {
-    const typeId = typeLabelToId[type]
-    if (!typeId || !date) return
-    try {
-      const params = new URLSearchParams({
-        date,
-        type: String(typeId),
-      })
-      const res = await fetch(
-        `/api/documents/list?${params.toString()}`,
-      )
-      if (!res.ok) {
-        throw new Error(`Request failed: ${res.status}`)
+  const handleSelect = useCallback(
+    async (date: string, type: string) => {
+      const typeId = typeLabelToId[type]
+      if (!typeId || !date) return
+      try {
+        const params = new URLSearchParams({
+          date,
+          type: String(typeId),
+        })
+        const res = await fetch(`/api/documents/list?${params.toString()}`)
+        if (!res.ok) {
+          throw new Error(`Request failed: ${res.status}`)
+        }
+        const docs: Document[] = await res.json()
+        setDocuments(docs)
+        setError(null)
+      } catch (err) {
+        console.error(err)
+        setDocuments([])
+        setError("Failed to fetch documents")
       }
-      const docs: Document[] = await res.json()
-      setDocuments(docs)
-      setError(null)
-    } catch (err) {
-      console.error(err)
-      setDocuments([])
-      setError("Failed to fetch documents")
-    }
-    setSelected({ date, type })
-  }, [])
+      setSelected({ date, type })
+    },
+    [typeLabelToId],
+  )
 
   const displayed = useMemo(
     () => data.slice(range[0], range[1] + 1),
@@ -133,9 +126,21 @@ export default function DocumentsChart() {
   /*                                   FETCH                                    */
   /* -------------------------------------------------------------------------- */
   useEffect(() => {
-    fetch("/api/documents/counts")
-      .then((res) => res.json())
-      .then((raw: RawCount[]) => {
+    async function load() {
+      try {
+        const [countsRes, typesRes] = await Promise.all([
+          fetch("/api/documents/counts"),
+          fetch("/api/documents/types"),
+        ])
+        const raw: RawCount[] = await countsRes.json()
+        const typeList: { id: number; label: string }[] = await typesRes.json()
+
+        const typeMap: Record<string, number> = {}
+        typeList.forEach(({ id, label }) => {
+          typeMap[label] = id
+        })
+        setTypeLabelToId(typeMap)
+
         const map = new Map<string, CountRow>()
         raw.forEach(({ period, type, count }) => {
           const row = map.get(period) ?? { date: period }
@@ -181,14 +186,23 @@ export default function DocumentsChart() {
         })
         setConfig(cfg)
         setVisible(visibility)
-      })
+      } catch (err) {
+        console.error(err)
+      }
+    }
+    load()
   }, [])
 
   /* -------------------------------------------------------------------------- */
   /*                                 TOOLTIP                                    */
   /* -------------------------------------------------------------------------- */
   const renderTooltip = useMemo(() => {
-    return (props: TooltipProps<number, string>) => {
+    return (
+      props: TooltipProps<number, string> & {
+        payload?: any[]
+        label?: string | number
+      }
+    ) => {
       const { active, payload, label } = props
       if (!active || !payload || !payload.length) return null
 
@@ -205,7 +219,7 @@ export default function DocumentsChart() {
                 <div
                   key={key}
                   className="flex items-center gap-2 whitespace-nowrap cursor-pointer"
-                  onClick={() => handleSelect(label, docLabel)}
+                  onClick={() => handleSelect(String(label ?? ""), docLabel)}
                 >
                   <span
                     className="inline-block h-2 w-2 rounded-sm"
@@ -280,7 +294,6 @@ export default function DocumentsChart() {
                 <Tooltip content={renderTooltip} />
                 <Brush
                   dataKey="date"
-                  data={data}
                   startIndex={range[0]}
                   endIndex={range[1]}
                   onChange={(e) =>

@@ -26,7 +26,10 @@ export function ChartContainer({ config, children, className, ...props }: ChartC
   )
 }
 
-export function ChartTooltipContent({ active, payload }: TooltipProps<number, string>) {
+export function ChartTooltipContent({
+  active,
+  payload,
+}: TooltipProps<number, string> & { payload?: any[] }) {
   if (!active || !payload?.length) return null
   const { name, value, color } = payload[0]
   return (
