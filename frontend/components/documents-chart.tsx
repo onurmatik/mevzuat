@@ -9,7 +9,6 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-  Brush,
 } from "recharts"
 // 🔹 Use TooltipProps from the component’s type declarations so `payload` is recognised
 import type { TooltipProps } from "recharts/types/component/Tooltip"
@@ -36,6 +35,8 @@ interface CountRow {
   [key: string]: number | string
 }
 
+type RangeOption = "all" | "thisYear" | "lastYear" | "30days"
+
 export default function DocumentsChart() {
   const [data, setData] = useState<CountRow[]>([])
   const [config, setConfig] = useState<ChartConfig>({})
@@ -46,8 +47,9 @@ export default function DocumentsChart() {
     null,
   )
   const [error, setError] = useState<string | null>(null)
-  const [range, setRange] = useState<[number, number]>([0, 0])
   const [typeLabelToId, setTypeLabelToId] = useState<Record<string, number>>({})
+  const [rangeOption, setRangeOption] = useState<RangeOption>("all")
+  const [interval, setInterval] = useState<"year" | "month" | "day">("year")
 
   const handleToggle = (key: string) =>
     setVisible((p) => ({ ...p, [key]: !p[key] }))
@@ -57,10 +59,21 @@ export default function DocumentsChart() {
       const typeId = typeLabelToId[type]
       if (!typeId || !date) return
       try {
-        const params = new URLSearchParams({
-          date,
-          type: String(typeId),
-        })
+        const d = new Date(date)
+        const params = new URLSearchParams({ type: String(typeId) })
+        let label = ""
+        if (interval === "day") {
+          const ds = d.toISOString().split("T")[0]
+          params.set("date", ds)
+          label = ds
+        } else if (interval === "month") {
+          params.set("year", String(d.getFullYear()))
+          params.set("month", String(d.getMonth() + 1))
+          label = d.toLocaleString(undefined, { month: "long", year: "numeric" })
+        } else {
+          params.set("year", String(d.getFullYear()))
+          label = String(d.getFullYear())
+        }
         const res = await fetch(`/api/documents/list?${params.toString()}`)
         if (!res.ok) {
           throw new Error(`Request failed: ${res.status}`)
@@ -68,71 +81,23 @@ export default function DocumentsChart() {
         const docs: Document[] = await res.json()
         setDocuments(docs)
         setError(null)
+        setSelected({ date: label, type })
       } catch (err) {
         console.error(err)
         setDocuments([])
         setError("Failed to fetch documents")
       }
-      setSelected({ date, type })
     },
-    [typeLabelToId],
+    [typeLabelToId, interval],
   )
-
-  const displayed = useMemo(
-    () => data.slice(range[0], range[1] + 1),
-    [data, range],
-  )
-
-  const zoomIn = () => {
-    const [start, end] = range
-    const span = end - start + 1
-    if (span <= 1) return
-    const mid = Math.floor((start + end) / 2)
-    const newSpan = Math.max(1, Math.floor(span / 2))
-    let newStart = Math.max(0, mid - Math.floor(newSpan / 2))
-    let newEnd = Math.min(data.length - 1, newStart + newSpan - 1)
-    setRange([newStart, newEnd])
-  }
-
-  const zoomOut = () => {
-    const [start, end] = range
-    const span = end - start + 1
-    const mid = Math.floor((start + end) / 2)
-    const newSpan = Math.min(data.length, span * 2)
-    let newStart = Math.max(0, mid - Math.floor(newSpan / 2))
-    let newEnd = Math.min(data.length - 1, newStart + newSpan - 1)
-    setRange([newStart, newEnd])
-  }
-
-  const panLeft = () => {
-    const [start, end] = range
-    const span = end - start
-    const step = Math.max(1, Math.floor(span / 4))
-    let newStart = Math.max(0, start - step)
-    let newEnd = newStart + span
-    setRange([newStart, newEnd])
-  }
-
-  const panRight = () => {
-    const [start, end] = range
-    const span = end - start
-    const step = Math.max(1, Math.floor(span / 4))
-    let newEnd = Math.min(data.length - 1, end + step)
-    let newStart = newEnd - span
-    setRange([newStart, newEnd])
-  }
 
   /* -------------------------------------------------------------------------- */
   /*                                   FETCH                                    */
   /* -------------------------------------------------------------------------- */
   useEffect(() => {
-    async function load() {
+    async function loadTypes() {
       try {
-        const [countsRes, typesRes] = await Promise.all([
-          fetch("/api/documents/counts"),
-          fetch("/api/documents/types"),
-        ])
-        const raw: RawCount[] = await countsRes.json()
+        const typesRes = await fetch("/api/documents/types")
         const typeList: { id: number; label: string }[] = await typesRes.json()
 
         // Map type labels to ids for later document fetching
@@ -141,31 +106,6 @@ export default function DocumentsChart() {
           typeMap[label] = id
         })
         setTypeLabelToId(typeMap)
-
-        // Only keep counts for types present in typeList
-        const allowed = new Set(typeList.map((t) => t.label))
-        const filtered = raw.filter((r) => allowed.has(r.type))
-
-        const map = new Map<string, CountRow>()
-        filtered.forEach(({ period, type, count }) => {
-          const row = map.get(period) ?? { date: period }
-          row[type] = count
-          map.set(period, row)
-        })
-
-        const sorted = Array.from(map.values()).sort((a, b) =>
-          a.date.localeCompare(b.date),
-        )
-        setData(sorted)
-
-        // Avoid negative indices when the dataset is empty which would cause
-        // NaN positioning values in Recharts components.
-        const end = Math.max(sorted.length - 1, 0)
-        const start = Math.max(end - 29, 0)
-        setRange([start, end])
-
-        // Build chart config only from types returned by /api/documents/types
-        const types = typeList.map((t) => t.label)
 
         const palette = [
           "var(--chart-1)",
@@ -182,9 +122,9 @@ export default function DocumentsChart() {
 
         const cfg: ChartConfig = {}
         const visibility: Record<string, boolean> = {}
-        types.forEach((t, idx) => {
-          cfg[t] = { label: t, color: palette[idx % palette.length] }
-          visibility[t] = true
+        typeList.forEach(({ label }, idx) => {
+          cfg[label] = { label, color: palette[idx % palette.length] }
+          visibility[label] = true
         })
         setConfig(cfg)
         setVisible(visibility)
@@ -192,8 +132,63 @@ export default function DocumentsChart() {
         console.error(err)
       }
     }
-    load()
+    loadTypes()
   }, [])
+
+  useEffect(() => {
+    async function loadCounts() {
+      try {
+        const today = new Date()
+        const params = new URLSearchParams()
+        let newInterval: "year" | "month" | "day" = "year"
+        if (rangeOption === "all") {
+          newInterval = "year"
+        } else if (rangeOption === "thisYear") {
+          newInterval = "month"
+          params.set("start_date", `${today.getFullYear()}-01-01`)
+          params.set("end_date", today.toISOString().split("T")[0])
+        } else if (rangeOption === "lastYear") {
+          newInterval = "month"
+          const year = today.getFullYear() - 1
+          params.set("start_date", `${year}-01-01`)
+          params.set("end_date", `${year}-12-31`)
+        } else {
+          newInterval = "day"
+          const past = new Date(today)
+          past.setDate(past.getDate() - 30)
+          params.set("start_date", past.toISOString().split("T")[0])
+          params.set("end_date", today.toISOString().split("T")[0])
+        }
+        params.set("interval", newInterval)
+        setInterval(newInterval)
+        const countsRes = await fetch(
+          `/api/documents/counts?${params.toString()}`,
+        )
+        const raw: RawCount[] = await countsRes.json()
+
+        const allowed = new Set(Object.keys(typeLabelToId))
+        const filtered = raw.filter((r) => allowed.has(r.type))
+
+        const map = new Map<string, CountRow>()
+        filtered.forEach(({ period, type, count }) => {
+          const row = map.get(period) ?? { date: period }
+          row[type] = count
+          map.set(period, row)
+        })
+
+        const sorted = Array.from(map.values()).sort((a, b) =>
+          a.date.localeCompare(b.date),
+        )
+        setData(sorted)
+        setSelected(null)
+      } catch (err) {
+        console.error(err)
+      }
+    }
+    if (Object.keys(typeLabelToId).length) {
+      loadCounts()
+    }
+  }, [rangeOption, typeLabelToId])
 
   /* -------------------------------------------------------------------------- */
   /*                                 TOOLTIP                                    */
@@ -269,41 +264,45 @@ export default function DocumentsChart() {
           ))}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={zoomIn}>
-            Zoom In
-          </Button>
-          <Button variant="outline" size="sm" onClick={zoomOut}>
-            Zoom Out
-          </Button>
-          <Button variant="outline" size="sm" onClick={panLeft}>
-            ◀
-          </Button>
-          <Button variant="outline" size="sm" onClick={panRight}>
-            ▶
-          </Button>
+          {(
+            [
+              ["all", "All"],
+              ["thisYear", "This Year"],
+              ["lastYear", "Last Year"],
+              ["30days", "30 Days"],
+            ] as [RangeOption, string][]
+          ).map(([key, label]) => (
+            <Button
+              key={key}
+              variant={rangeOption === key ? "default" : "outline"}
+              size="sm"
+              onClick={() => setRangeOption(key)}
+            >
+              {label}
+            </Button>
+          ))}
         </div>
         <ChartContainer config={config}>
-          {displayed.length > 0 ? (
+          {data.length > 0 ? (
             <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={displayed}>
+              <BarChart data={data}>
                 <CartesianGrid vertical={false} />
                 <XAxis
                   dataKey="date"
                   tickLine={false}
-                  tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                  tickFormatter={(value) => {
+                    const d = new Date(value)
+                    if (interval === "year") return String(d.getFullYear())
+                    if (interval === "month")
+                      return d.toLocaleDateString(undefined, {
+                        month: "short",
+                        year: "numeric",
+                      })
+                    return d.toLocaleDateString()
+                  }}
                 />
                 <YAxis tickLine={false} />
                 <Tooltip content={renderTooltip} />
-                <Brush
-                  dataKey="date"
-                  startIndex={range[0]}
-                  endIndex={range[1]}
-                  onChange={(e) =>
-                    e?.startIndex != null && e?.endIndex != null
-                      ? setRange([e.startIndex, e.endIndex])
-                      : null
-                  }
-                />
 
                 {Object.entries(config)
                   .filter(([key]) => visible[key] !== false)
