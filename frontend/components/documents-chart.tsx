@@ -135,14 +135,19 @@ export default function DocumentsChart() {
         const raw: RawCount[] = await countsRes.json()
         const typeList: { id: number; label: string }[] = await typesRes.json()
 
+        // Map type labels to ids for later document fetching
         const typeMap: Record<string, number> = {}
         typeList.forEach(({ id, label }) => {
           typeMap[label] = id
         })
         setTypeLabelToId(typeMap)
 
+        // Only keep counts for types present in typeList
+        const allowed = new Set(typeList.map((t) => t.label))
+        const filtered = raw.filter((r) => allowed.has(r.type))
+
         const map = new Map<string, CountRow>()
-        raw.forEach(({ period, type, count }) => {
+        filtered.forEach(({ period, type, count }) => {
           const row = map.get(period) ?? { date: period }
           row[type] = count
           map.set(period, row)
@@ -159,11 +164,8 @@ export default function DocumentsChart() {
         const start = Math.max(end - 29, 0)
         setRange([start, end])
 
-        const typeSet = new Set<string>()
-        sorted.forEach((row) => {
-          Object.keys(row).forEach((k) => k !== "date" && typeSet.add(k))
-        })
-        const types = Array.from(typeSet)
+        // Build chart config only from types returned by /api/documents/types
+        const types = typeList.map((t) => t.label)
 
         const palette = [
           "var(--chart-1)",
