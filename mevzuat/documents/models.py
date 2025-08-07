@@ -1,3 +1,4 @@
+from datetime import datetime
 import uuid
 from functools import cached_property
 from django.core.exceptions import ValidationError
@@ -56,6 +57,7 @@ class Document(models.Model):
     type = models.ForeignKey(DocumentType, on_delete=models.SET_NULL, null=True, blank=True, related_name='documents')
 
     title = models.CharField(max_length=300)
+    date = models.DateField(blank=True, null=True)  # The significant date for the doc; e.g.: effective date, pub date, etc.
 
     document = models.FileField(upload_to=document_upload_to, blank=True, null=True)
     markdown = models.FileField(upload_to=document_upload_to, blank=True, null=True)
@@ -64,6 +66,10 @@ class Document(models.Model):
     embedding = VectorField(dimensions=1536, blank=True, null=True)
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        self.date = datetime.strptime(self.metadata['resmi_gazete_tarihi'], '%Y-%m-%d').date()
+        super().save(*args, **kwargs)
 
     class Meta:
         """
