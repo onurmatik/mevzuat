@@ -44,6 +44,16 @@ class DocumentOut(Schema):
         populate_by_name = True
 
 
+class DocumentTypeOut(Schema):
+    """Schema representing a document type."""
+
+    id: int
+    label: str = Field(..., alias="name")
+
+    class Config:
+        from_attributes = True
+
+
 @router.post("/vector-stores/{vs_uuid}/search")
 def search_vector_store(
     request,
@@ -104,6 +114,12 @@ def list_vector_stores(request):
 
     # Convert QuerySet of dicts to list so Ninja can serialise it cleanly
     return list(qs)
+
+
+@router.get("/types", response=List[DocumentTypeOut])
+def list_document_types(request):
+    """Return all available document types ordered by name."""
+    return DocumentType.objects.only("id", "name").order_by("name")
 
 
 @router.get("/counts")
