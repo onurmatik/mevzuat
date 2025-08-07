@@ -39,8 +39,6 @@ class DocumentOut(Schema):
         from_attributes = True
 
 
-
-
 @router.post("/vector-stores/{vs_id}/search")
 def search_vector_store(request, vs_id: str, payload: VectorSearchPayload):
     """Query a vector store and return relevant results."""
