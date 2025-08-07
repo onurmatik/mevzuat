@@ -20,9 +20,9 @@ import { ChartContainer, ChartConfig } from "@/components/ui/chart"
 
 interface Document {
   id: number
-  name: string
-  mevzuat_tur: number
-  resmi_gazete_tarihi?: string
+  title: string
+  type: number
+  date?: string
 }
 
 const typeLabelToId: Record<string, number> = {
@@ -34,13 +34,19 @@ const typeLabelToId: Record<string, number> = {
   "Cumhurbaşkanlığı Genelgesi": 22,
 }
 
-interface CountsResponse {
+interface RawCount {
+  period: string
+  type: string
+  count: number
+}
+
+interface CountRow {
   date: string
   [key: string]: number | string
 }
 
 export default function DocumentsChart() {
-  const [data, setData] = useState<CountsResponse[]>([])
+  const [data, setData] = useState<CountRow[]>([])
   const [config, setConfig] = useState<ChartConfig>({})
   const [visible, setVisible] = useState<Record<string, boolean>>({})
   const [stacked, setStacked] = useState(false)
@@ -60,7 +66,7 @@ export default function DocumentsChart() {
     try {
       const params = new URLSearchParams({
         date,
-        mevzuat_tur: String(typeId),
+        type: String(typeId),
       })
       const res = await fetch(
         `/api/documents/list?${params.toString()}`,
@@ -129,8 +135,15 @@ export default function DocumentsChart() {
   useEffect(() => {
     fetch("/api/documents/counts")
       .then((res) => res.json())
-      .then((raw: CountsResponse[]) => {
-        const sorted = [...raw].sort((a, b) =>
+      .then((raw: RawCount[]) => {
+        const map = new Map<string, CountRow>()
+        raw.forEach(({ period, type, count }) => {
+          const row = map.get(period) ?? { date: period }
+          row[type] = count
+          map.set(period, row)
+        })
+
+        const sorted = Array.from(map.values()).sort((a, b) =>
           a.date.localeCompare(b.date),
         )
         setData(sorted)
@@ -313,7 +326,7 @@ export default function DocumentsChart() {
             ) : documents.length ? (
               <ul className="list-disc pl-4">
                 {documents.map((doc) => (
-                  <li key={doc.id}>{doc.name}</li>
+                  <li key={doc.id}>{doc.title}</li>
                 ))}
               </ul>
             ) : (
