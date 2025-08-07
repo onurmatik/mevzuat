@@ -5,7 +5,7 @@ import tempfile
 from django.core.files.base import ContentFile
 from django.test import TestCase, override_settings
 
-from .models import Document, DocumentType
+from .models import Document, DocumentType, VectorStore
 
 
 class DocumentListAPITest(TestCase):
@@ -106,17 +106,17 @@ class DocumentListAPITest(TestCase):
 
 class DocumentTypeAPITest(TestCase):
     def setUp(self):
-        DocumentType.objects.create(id=1, name="Kanun", fetcher="MevzuatFetcher")
+        vs = VectorStore.objects.create(name="VS1", oai_vs_id="vs1")
+        DocumentType.objects.create(
+            id=1,
+            name="Kanun",
+            fetcher="MevzuatFetcher",
+            default_vector_store=vs,
+        )
         DocumentType.objects.create(id=2, name="Tüzük", fetcher="MevzuatFetcher")
 
     def test_list_document_types(self):
         response = self.client.get("/api/documents/types")
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(
-            data,
-            [
-                {"id": 1, "label": "Kanun"},
-                {"id": 2, "label": "Tüzük"},
-            ],
-        )
+        self.assertEqual(data, [{"id": 1, "label": "Kanun"}])

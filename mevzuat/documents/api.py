@@ -119,7 +119,12 @@ def list_vector_stores(request):
 @router.get("/types", response=List[DocumentTypeOut])
 def list_document_types(request):
     """Return all available document types ordered by name."""
-    return DocumentType.objects.only("id", "name").order_by("name")
+    return (
+        DocumentType.objects
+        .filter(default_vector_store__isnull=False)
+        .only("id", "name")
+        .order_by("name")
+    )
 
 
 @router.get("/counts")
