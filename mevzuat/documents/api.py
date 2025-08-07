@@ -7,7 +7,7 @@ from django.db.models.functions import ExtractYear, Cast, TruncDay, TruncMonth
 from ninja import Router, Schema
 from openai import OpenAI
 
-from .models import Document
+from .models import Document, DocumentType
 
 
 router = Router()
@@ -37,20 +37,6 @@ class DocumentOut(Schema):
 
     class Config:
         from_attributes = True
-
-
-# Mapping of ``mevzuat_tur`` integer codes to their human readable labels.
-# These values were previously defined on the old ``Mevzuat`` model as
-# ``choices`` and are now represented here explicitly so the API continues to
-# return labelled data after the model refactor.
-MEVZUAT_TUR_LABELS: dict[int, str] = {
-    1: "Kanun",
-    4: "KHK",
-    19: "Cumhurbaşkanlığı Kararnamesi",
-    20: "Cumhurbaşkanı Kararı",
-    21: "Cumhurbaşkanlığı Yönetmeliği",
-    22: "Cumhurbaşkanlığı Genelgesi",
-}
 
 
 @router.post("/vector-stores/{vs_id}/search")
@@ -107,6 +93,8 @@ def document_counts(
         )
         start_date = earliest or (end_date - timedelta(days=30))
 
+    type_labels = dict(DocumentType.objects.values_list("id", "name"))
+
     qs = (
         Document.objects.exclude(metadata__resmi_gazete_tarihi__isnull=True)
         .annotate(
@@ -114,7 +102,7 @@ def document_counts(
             rg_date=Cast("metadata__resmi_gazete_tarihi", DateField()),
         )
         .filter(rg_date__range=(start_date, end_date))
-        .filter(mevzuat_tur__in=MEVZUAT_TUR_LABELS.keys())
+        .filter(mevzuat_tur__in=type_labels.keys())
     )
 
     if interval == "month":
@@ -137,7 +125,7 @@ def document_counts(
             key = period_val.isoformat()
         else:
             key = str(period_val)
-        label = MEVZUAT_TUR_LABELS.get(row["mevzuat_tur"], str(row["mevzuat_tur"]))
+        label = type_labels.get(row["mevzuat_tur"], str(row["mevzuat_tur"]))
         result.setdefault(key, {})[label] = row["count"]
     return [{"date": k, **counts} for k, counts in sorted(result.items())]
 

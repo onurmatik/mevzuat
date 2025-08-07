@@ -14,11 +14,16 @@ class DocumentListAPITest(TestCase):
         self.override = override_settings(MEDIA_ROOT=self.tempdir)
         self.override.enable()
 
-        doc_type = DocumentType.objects.create(name="Law", fetcher="MevzuatFetcher")
+        type1 = DocumentType.objects.create(
+            id=1, name="Kanun", fetcher="MevzuatFetcher"
+        )
+        type2 = DocumentType.objects.create(
+            id=2, name="Tüzük", fetcher="MevzuatFetcher"
+        )
 
         Document.objects.create(
             title="Law 1",
-            type=doc_type,
+            type=type1,
             document=ContentFile(b"a", name="law1.pdf"),
             metadata={
                 "mevzuat_tur": 1,
@@ -29,7 +34,7 @@ class DocumentListAPITest(TestCase):
         )
         Document.objects.create(
             title="Law 2",
-            type=doc_type,
+            type=type2,
             document=ContentFile(b"b", name="law2.pdf"),
             metadata={
                 "mevzuat_tur": 2,
@@ -40,7 +45,7 @@ class DocumentListAPITest(TestCase):
         )
         Document.objects.create(
             title="Law 3",
-            type=doc_type,
+            type=type1,
             document=ContentFile(b"c", name="law3.pdf"),
             metadata={
                 "mevzuat_tur": 1,
