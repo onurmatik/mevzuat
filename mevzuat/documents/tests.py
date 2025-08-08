@@ -1,6 +1,8 @@
 from datetime import date
+import json
 import shutil
 import tempfile
+from unittest.mock import patch
 
 from django.core.files.base import ContentFile
 from django.test import TestCase, override_settings
@@ -120,3 +122,33 @@ class DocumentTypeAPITest(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data, [{"id": 1, "label": "Kanun"}])
+
+
+class VectorStoreSearchAPITest(TestCase):
+    def setUp(self):
+        self.vs = VectorStore.objects.create(name="VS1", oai_vs_id="vs1")
+
+    @patch("mevzuat.documents.api.OpenAI")
+    def test_search_with_filters(self, MockOpenAI):
+        instance = MockOpenAI.return_value
+        instance.vector_stores.search.return_value = {"data": []}
+
+        payload = {
+            "query": "term",
+            "filters": {"type": "eq", "key": "type", "value": "blog"},
+        }
+
+        url = f"/api/documents/vector-stores/{self.vs.uuid}/search"
+        response = self.client.post(
+            url, data=json.dumps(payload), content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 200)
+
+        instance.vector_stores.search.assert_called_with(
+            vector_store_id="vs1",
+            query="term",
+            filters={"type": "eq", "key": "type", "value": "blog"},
+            max_num_results=10,
+            ranking_options=None,
+            rewrite_query=True,
+        )

@@ -29,6 +29,7 @@ class VectorSearchPayload(Schema):
     limit: int = 10
     score_threshold: Optional[float] = None
     rewrite_query: bool = True
+    filters: Optional[dict] = None
 
 
 class DocumentOut(Schema):
@@ -65,6 +66,8 @@ def search_vector_store(
 
     * ``vs_uuid`` – The UUID of the :class:`VectorStore` object.
       The view resolves this to the underlying ``oai_vs_id`` that OpenAI expects.
+    * ``filters`` – Optional filter dictionary passed directly to OpenAI, allowing
+      restriction of results by file attributes such as document type or date.
     """
 
     try:
@@ -78,13 +81,17 @@ def search_vector_store(
     if payload.score_threshold is not None:
         ranking_options["score_threshold"] = payload.score_threshold
 
-    response = client.vector_stores.search(
-        vector_store_id=vs.oai_vs_id,          # use the OpenAI-side ID
-        query=payload.query,
-        max_num_results=payload.limit,
-        ranking_options=ranking_options or None,
-        rewrite_query=payload.rewrite_query,
-    )
+    search_kwargs = {
+        "vector_store_id": vs.oai_vs_id,
+        "query": payload.query,
+        "max_num_results": payload.limit,
+        "ranking_options": ranking_options or None,
+        "rewrite_query": payload.rewrite_query,
+    }
+    if payload.filters is not None:
+        search_kwargs["filters"] = payload.filters
+
+    response = client.vector_stores.search(**search_kwargs)
 
     return response
 
