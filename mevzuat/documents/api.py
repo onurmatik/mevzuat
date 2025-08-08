@@ -128,7 +128,7 @@ def list_document_types(request):
     """Return all available document types ordered by name."""
     return (
         DocumentType.objects
-        .filter(default_vector_store__isnull=False)
+        .filter(vector_store__isnull=False)
         .only("id", "name")
         .order_by("name")
     )
@@ -145,7 +145,7 @@ def document_counts(
     Return document counts grouped by a time interval and type.
 
     If ``start_date`` is not provided, the earliest available publication date
-    (``Document.created_at``) is used. ``end_date`` defaults to today.
+    (``Document.date``) is used. ``end_date`` defaults to today.
     ``interval`` may be one of ``"day"``, ``"month"`` or ``"year"``.
     """
     if interval not in {"day", "month", "year"}:
@@ -155,20 +155,23 @@ def document_counts(
 
     # --- Default date boundaries ------------------------------------------------
     if start_date is None:
-        first_ts = qs.order_by("created_at").values_list("created_at", flat=True).first()
+        first_ts = qs.order_by("date").values_list("date", flat=True).first()
         # If there are no documents yet, default to today so we don’t blow up later.
-        start_date = first_ts.date() if first_ts else timezone.now().date()
+        start_date = first_ts if first_ts else timezone.now().date()
 
     if end_date is None:
         end_date = timezone.now().date()
 
-    qs = qs.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+    # initial cutoff
+    qs = qs.filter(date__year__gte=2000)
+
+    qs = qs.filter(date__gte=start_date, date__lte=end_date)
 
     # --- Pick the appropriate truncation function ------------------------------
     truncator = {
-        "day": TruncDay("created_at"),
-        "month": TruncMonth("created_at"),
-        "year": TruncYear("created_at"),
+        "day": TruncDay("date"),
+        "month": TruncMonth("date"),
+        "year": TruncYear("date"),
     }[interval]
 
     # --- Aggregate counts -------------------------------------------------------
@@ -182,7 +185,7 @@ def document_counts(
     # --- Normalise output so it’s JSON-serialisable -----------------------------
     results: list[dict[str, Any]] = []
     for row in qs:
-        period = row["period"].date()  # strip time component
+        period = row["period"]
         results.append(
             {
                 "period": period.isoformat(),

@@ -7,6 +7,26 @@ mevzuat.info is a service for tracking and querying Turkish legislation. The pro
 - `mevzuat/` – Django application providing web interface and APIs.
 - `scripts/` – helper scripts used to fetch and process legislative documents.
 
+## Installation
+
+### Backend
+pip install -r requirements.txt
+
+### Frontend
+
+npm install react react-dom
+
+npx create-next-app@latest frontend
+
+npm install -D tailwindcss postcss autoprefixer
+
+cd frontend
+
+npx shadcn@latest init
+
+npm install recharts
+
+
 ## Contributing
 
 Contributions are welcome. Please ensure code changes are checked with `python -m py_compile` before submitting.

@@ -23,7 +23,7 @@ class DocumentType(models.Model):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(unique=True, blank=True)
     description = models.TextField(blank=True)
-    default_vector_store = models.ForeignKey(
+    vector_store = models.ForeignKey(
         VectorStore, on_delete=models.SET_NULL,
         null=True, blank=True
     )
@@ -39,7 +39,7 @@ class DocumentType(models.Model):
 
     def clean(self):
         from .fetchers import _registry
-        if self.fetcher not in _registry:
+        if self.fetcher and self.fetcher not in _registry:
             raise ValidationError({"fetcher": "Unknown fetcher class"})
 
     @cached_property
@@ -102,19 +102,18 @@ class Document(models.Model):
         return merged
 
     def get_vectorstore_id(self):
-        """Return the vectorstore id for this document type.
+        # Returns the default vectorstore id for this document type.
+        if not self.type:
+            raise ValidationError("Document type is not set")
+        elif not self.type.vector_store:
+            raise ValidationError(f"No vectorstore configured for document type {self.type}")
+        return self.type.vector_store.oai_vs_id
 
-        Looks up ``settings.VECTORSTORES`` using the child class name.
-        """
-        try:
-            return settings.VECTORSTORES[self.__class__.__name__]
-        except KeyError as exc:
-            raise KeyError(
-                f"No vectorstore configured for {self.__class__.__name__}"
-            ) from exc
+    def fetch_and_store_document(self, overwrite=False):
+        return self._fetcher().fetch_and_store_document(self, overwrite=overwrite)
 
-    def get_metadata(self):
-        raise NotImplementedError("Child class should implement get_metadata()")
+    def convert_pdf_to_markdown(self, overwrite=False):
+        return self._fetcher().convert_pdf_to_markdown(self, overwrite=overwrite)
 
-    def get_document_upload_to(self, filename):
-        raise NotImplementedError("Child class should implement get_document_upload_to()")
+    def upload_to_vectorstore(self):
+        return self._fetcher().upload_to_vectorstore(self)

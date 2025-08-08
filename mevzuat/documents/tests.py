@@ -113,7 +113,7 @@ class DocumentTypeAPITest(TestCase):
             id=1,
             name="Kanun",
             fetcher="MevzuatFetcher",
-            default_vector_store=vs,
+            vector_store=vs,
         )
         DocumentType.objects.create(id=2, name="Tüzük", fetcher="MevzuatFetcher")
 

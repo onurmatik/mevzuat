@@ -6,18 +6,27 @@ from urllib.parse import urlparse
 import requests
 from docling.document_converter import DocumentConverter
 from django.core.files.base import ContentFile
-from django.db import transaction
+from django.db import transaction, models
 
 
 class BaseDocFetcher(abc.ABC):
     """Common interface for every fetcher."""
     @abc.abstractmethod
-    def build_original_url(self, doc) -> str: ...
+    def original_document_url(self, doc) -> str: ...
 
     @abc.abstractmethod
     def extract_metadata(self, doc) -> dict: ...
 
-    def convert_pdf_to_markdown(self, doc, *, overwrite: bool = False) -> "models.FileField":
+    @abc.abstractmethod
+    def fetch_and_store_document(
+            self,
+            doc: "Document",
+            *,
+            overwrite: bool = False,
+            timeout: int = 30
+    ) -> models.FileField: ...
+
+    def convert_pdf_to_markdown(self, doc: "Document", *, overwrite: bool = False) -> "models.FileField":
         """Convert the stored PDF into Markdown and persist it.
 
         Parameters
@@ -45,9 +54,7 @@ class BaseDocFetcher(abc.ABC):
         result = converter.convert(doc.document.path)
         markdown_text = result.document.export_to_markdown()
 
-        filename = (
-            os.path.splitext(os.path.basename(doc.document.title))[0] + ".md"
-        )
+        filename = f"{doc.uuid}.md"
 
         with transaction.atomic():
             doc.markdown.save(filename, ContentFile(markdown_text), save=False)
@@ -92,11 +99,19 @@ class BaseDocFetcher(abc.ABC):
         doc.oai_file_id = uploaded_file.id
         doc.save(update_fields=["oai_file_id"])
 
-        # Attach the uploaded file to the vector store.
+        # Build the attributes
+        attributes = {
+            "date": doc.date.strftime("%Y-%m-%d"),
+            "type": doc.type.slug,
+        }
+        attributes.update(doc.metadata)
+
+        # Attach the uploaded file to the vector store
         vector_store_id = doc.get_vectorstore_id()
         client.vector_stores.files.create(
             vector_store_id=vector_store_id,
             file_id=uploaded_file.id,
+            attributes=attributes,
         )
 
         return uploaded_file.id
@@ -127,14 +142,14 @@ def get(name: str) -> BaseDocFetcher:
 
 @register
 class MevzuatFetcher(BaseDocFetcher):
-    def build_original_url(self, doc):
+    def original_document_url(self, doc):
         uri = f"{doc.metadata['mevzuat_tur']}.{doc.metadata['mevzuat_tertib']}.{doc.metadata['mevzuat_no']}.pdf"
         return f"https://www.mevzuat.gov.tr/MevzuatMetin/{uri}"
 
     def get_document_date(self, doc):
         return datetime.strptime(doc.metadata['resmi_gazete_tarihi'], '%Y-%m-%d').date()
 
-    def fetch_and_store_document(self, *, overwrite: bool = False, timeout: int = 30) -> "models.FileField":
+    def fetch_and_store_document(self, doc, *, overwrite: bool = False, timeout: int = 30) -> "models.FileField":
         """
         Download the PDF at ``self.original_document_url()`` and save it into
         ``self.document``.
@@ -156,11 +171,12 @@ class MevzuatFetcher(BaseDocFetcher):
         requests.RequestException
             On any network / HTTP error. Callers can catch and handle.
         """
-        # Skip unless we need to fetch (honouring the overwrite flag)
-        if self.document and not overwrite:
-            return self.document
 
-        pdf_url = self.original_document_url()
+        # Skip unless we need to fetch (honouring the overwrite flag)
+        if doc.document and not overwrite:
+            return doc.document
+
+        pdf_url = self.original_document_url(doc)
         if not pdf_url:
             raise ValueError("original_document_url() returned an empty URL")
 
@@ -179,15 +195,14 @@ class MevzuatFetcher(BaseDocFetcher):
         response = requests.get(pdf_url, headers=default_headers, timeout=timeout)
         response.raise_for_status()  # will raise if status ≥ 400
 
-        # Derive a sensible filename, e.g. '1.5.7557.pdf'
-        filename = os.path.basename(urlparse(pdf_url).path) or f"{self.uuid}.pdf"
+        filename = f"{doc.uuid}.pdf"
 
         # Save inside a transaction so the DB row and the file write stay in sync
         with transaction.atomic():
-            self.document.save(filename, ContentFile(response.content), save=False)
-            self.save(update_fields=["document"])
+            doc.document.save(filename, ContentFile(response.content), save=False)
+            doc.save(update_fields=["document"])
 
-        return self.document
+        return doc.document
 
     def extract_metadata(self, doc):
         pass

@@ -1,6 +1,4 @@
 from django.contrib import admin, messages
-from django.utils.html import format_html
-
 from .models import Document, VectorStore, DocumentType
 
 
@@ -11,7 +9,7 @@ class VectorStoreAdmin(admin.ModelAdmin):
 
 @admin.register(DocumentType)
 class DocumentTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'document_count', 'default_vector_store')
+    list_display = ('name', 'slug', 'fetcher', 'document_count', 'vector_store')
 
 
 class HasDocumentFilter(admin.SimpleListFilter):
@@ -36,19 +34,19 @@ class DocumentAdmin(admin.ModelAdmin):
         "title",
         "mevzuat_no",
         "type",
-        "resmi_gazete_tarihi",
+        "date",
         "has_pdf",
-        "has_md",
         "in_vs",
+        "has_md",
     )
     list_filter = (
-        "type",
+        "type", "date"
     )
     search_fields = ("metadata__mevzuat_no", "title")
     actions = (
-        "fetch_selected_documents",
-        "convert_selected_to_markdown",
-        "upload_selected_to_vectorstore",
+        "fetch_original",
+        "convert_to_markdown",
+        "upload_to_vectorstore",
     )
 
     def mevzuat_no(self, obj):
@@ -69,8 +67,7 @@ class DocumentAdmin(admin.ModelAdmin):
     def in_vs(self, obj: Document) -> bool:
         return bool(obj.oai_file_id)
 
-    @admin.action(description="Fetch and attach PDF for selected Document")
-    def fetch_selected_documents(self, request, queryset):
+    def fetch_original(self, request, queryset):
         ok, failed = 0, 0
         for obj in queryset:
             try:
@@ -92,8 +89,7 @@ class DocumentAdmin(admin.ModelAdmin):
                 level=messages.WARNING,
             )
 
-    @admin.action(description="Convert stored PDF to Markdown for selected Document")
-    def convert_selected_to_markdown(self, request, queryset):
+    def convert_to_markdown(self, request, queryset):
         ok, failed = 0, 0
         for obj in queryset:
             try:
@@ -114,10 +110,7 @@ class DocumentAdmin(admin.ModelAdmin):
                 level=messages.WARNING,
             )
 
-    @admin.action(
-        description="Upload document to OpenAI vector store for selected Document"
-    )
-    def upload_selected_to_vectorstore(self, request, queryset):
+    def upload_to_vectorstore(self, request, queryset):
         ok, failed = 0, 0
         for obj in queryset:
             obj.upload_to_vectorstore()
