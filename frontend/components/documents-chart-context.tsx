@@ -1,9 +1,21 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react"
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react"
+import { DateRange } from "react-day-picker"
 import { ChartConfig } from "@/components/ui/chart"
 
-export type RangeOption = "all" | "thisYear" | "lastYear" | "30days"
+export type RangeOption =
+  | "all"
+  | "thisYear"
+  | "lastYear"
+  | "30days"
+  | "custom"
 
 interface DocumentsChartContextValue {
   config: ChartConfig
@@ -11,6 +23,8 @@ interface DocumentsChartContextValue {
   toggleVisible: (key: string) => void
   rangeOption: RangeOption
   setRangeOption: (r: RangeOption) => void
+  customRange: DateRange | undefined
+  setCustomRange: (r: DateRange | undefined) => void
   typeLabelToId: Record<string, number>
 }
 
@@ -23,6 +37,7 @@ export function DocumentsChartProvider({ children }: { children: ReactNode }) {
   const [visible, setVisible] = useState<Record<string, boolean>>({})
   const [typeLabelToId, setTypeLabelToId] = useState<Record<string, number>>({})
   const [rangeOption, setRangeOption] = useState<RangeOption>("all")
+  const [customRange, setCustomRange] = useState<DateRange | undefined>()
 
   useEffect(() => {
     async function loadTypes() {
@@ -69,7 +84,16 @@ export function DocumentsChartProvider({ children }: { children: ReactNode }) {
 
   return (
     <DocumentsChartContext.Provider
-      value={{ config, visible, toggleVisible, rangeOption, setRangeOption, typeLabelToId }}
+      value={{
+        config,
+        visible,
+        toggleVisible,
+        rangeOption,
+        setRangeOption,
+        customRange,
+        setCustomRange,
+        typeLabelToId,
+      }}
     >
       {children}
     </DocumentsChartContext.Provider>
