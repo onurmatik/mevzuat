@@ -15,7 +15,8 @@ import type { TooltipProps } from "recharts/types/component/Tooltip"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChartContainer, ChartConfig } from "@/components/ui/chart"
+import { ChartContainer } from "@/components/ui/chart"
+import { useDocumentsChart } from "@/components/documents-chart-context"
 
 interface Document {
   id: number
@@ -35,24 +36,16 @@ interface CountRow {
   [key: string]: number | string
 }
 
-type RangeOption = "all" | "thisYear" | "lastYear" | "30days"
-
 export default function DocumentsChart() {
+  const { config, visible, rangeOption, typeLabelToId } = useDocumentsChart()
   const [data, setData] = useState<CountRow[]>([])
-  const [config, setConfig] = useState<ChartConfig>({})
-  const [visible, setVisible] = useState<Record<string, boolean>>({})
   const [stacked, setStacked] = useState(false)
   const [documents, setDocuments] = useState<Document[]>([])
   const [selected, setSelected] = useState<{ date: string; type: string } | null>(
     null,
   )
   const [error, setError] = useState<string | null>(null)
-  const [typeLabelToId, setTypeLabelToId] = useState<Record<string, number>>({})
-  const [rangeOption, setRangeOption] = useState<RangeOption>("all")
   const [interval, setInterval] = useState<"year" | "month" | "day">("year")
-
-  const handleToggle = (key: string) =>
-    setVisible((p) => ({ ...p, [key]: !p[key] }))
 
   const handleSelect = useCallback(
     async (date: string, type: string) => {
@@ -94,47 +87,6 @@ export default function DocumentsChart() {
   /* -------------------------------------------------------------------------- */
   /*                                   FETCH                                    */
   /* -------------------------------------------------------------------------- */
-  useEffect(() => {
-    async function loadTypes() {
-      try {
-        const typesRes = await fetch("/api/documents/types")
-        const typeList: { id: number; label: string }[] = await typesRes.json()
-
-        // Map type labels to ids for later document fetching
-        const typeMap: Record<string, number> = {}
-        typeList.forEach(({ id, label }) => {
-          typeMap[label] = id
-        })
-        setTypeLabelToId(typeMap)
-
-        const palette = [
-          "var(--chart-1)",
-          "var(--chart-2)",
-          "var(--chart-3)",
-          "var(--chart-4)",
-          "var(--chart-5)",
-          "var(--chart-6)",
-          "var(--chart-7)",
-          "var(--chart-8)",
-          "var(--chart-9)",
-          "var(--chart-10)",
-        ]
-
-        const cfg: ChartConfig = {}
-        const visibility: Record<string, boolean> = {}
-        typeList.forEach(({ label }, idx) => {
-          cfg[label] = { label, color: palette[idx % palette.length] }
-          visibility[label] = true
-        })
-        setConfig(cfg)
-        setVisible(visibility)
-      } catch (err) {
-        console.error(err)
-      }
-    }
-    loadTypes()
-  }, [])
-
   useEffect(() => {
     async function loadCounts() {
       try {
@@ -245,43 +197,7 @@ export default function DocumentsChart() {
         </Button>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap gap-4">
-          {Object.entries(config).map(([key, { label, color }]) => (
-            <label key={key} className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={visible[key] ?? true}
-                onChange={() => handleToggle(key)}
-                className="rounded border-gray-300"
-              />
-              <span
-                className="inline-block h-2 w-2 rounded-sm"
-                style={{ background: color }}
-              />
-              {label}
-            </label>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              ["all", "All"],
-              ["thisYear", "This Year"],
-              ["lastYear", "Last Year"],
-              ["30days", "30 Days"],
-            ] as [RangeOption, string][]
-          ).map(([key, label]) => (
-            <Button
-              key={key}
-              variant={rangeOption === key ? "default" : "outline"}
-              size="sm"
-              onClick={() => setRangeOption(key)}
-            >
-              {label}
-            </Button>
-          ))}
-        </div>
+      <CardContent>
         <ChartContainer config={config}>
           {data.length > 0 ? (
             <ResponsiveContainer width="100%" height={350}>

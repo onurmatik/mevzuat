@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,6 +16,7 @@ export default function SearchPage() {
   const [results, setResults] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [vectorStores, setVectorStores] = useState<VectorStore[]>([])
+  const searchParams = useSearchParams()
 
   useEffect(() => {
     async function fetchVectorStores() {
@@ -28,6 +30,37 @@ export default function SearchPage() {
     }
     fetchVectorStores()
   }, [])
+
+  useEffect(() => {
+    const q = searchParams.get("q")
+    if (q) setQuery(q)
+  }, [searchParams])
+
+  useEffect(() => {
+    const q = searchParams.get("q")
+    if (!q || vectorStores.length === 0) return
+    ;(async () => {
+      setLoading(true)
+      try {
+        const responses = await Promise.all(
+          vectorStores.map((vs) =>
+            fetch(`/api/documents/vector-stores/${vs.id}/search`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ query: q }),
+            }).then((r) => r.json()),
+          ),
+        )
+        const combined = responses.flatMap((r) => r?.data || [])
+        setResults(combined)
+      } catch (err) {
+        console.error(err)
+        setResults([])
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [searchParams, vectorStores])
 
   async function onSearch(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
