@@ -37,7 +37,8 @@ interface CountRow {
 }
 
 export default function DocumentsChart() {
-  const { config, visible, rangeOption, typeLabelToId } = useDocumentsChart()
+  const { config, visible, rangeOption, customRange, typeLabelToId } =
+    useDocumentsChart()
   const [data, setData] = useState<CountRow[]>([])
   const [stacked, setStacked] = useState(false)
   const [documents, setDocuments] = useState<Document[]>([])
@@ -104,6 +105,16 @@ export default function DocumentsChart() {
           const year = today.getFullYear() - 1
           params.set("start_date", `${year}-01-01`)
           params.set("end_date", `${year}-12-31`)
+        } else if (rangeOption === "custom" && customRange?.from && customRange?.to) {
+          newInterval = "day"
+          params.set(
+            "start_date",
+            customRange.from.toISOString().split("T")[0],
+          )
+          params.set(
+            "end_date",
+            customRange.to.toISOString().split("T")[0],
+          )
         } else {
           newInterval = "day"
           const past = new Date(today)
@@ -140,7 +151,7 @@ export default function DocumentsChart() {
     if (Object.keys(typeLabelToId).length) {
       loadCounts()
     }
-  }, [rangeOption, typeLabelToId])
+  }, [rangeOption, typeLabelToId, customRange])
 
   /* -------------------------------------------------------------------------- */
   /*                                 TOOLTIP                                    */
