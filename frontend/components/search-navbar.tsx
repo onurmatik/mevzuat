@@ -15,6 +15,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Calendar } from "@/components/ui/calendar"
+import { Input } from "@/components/ui/input"
 import { format } from "date-fns"
 
 export default function SearchNavbar() {
@@ -59,18 +60,9 @@ export default function SearchNavbar() {
     fetchVectorStores()
   }, [])
 
-  const activeSeries = Object.entries(visible)
-    .filter(([, v]) => v)
-    .map(([k]) => k)
-
-  function handleSeriesChange(values: string[]) {
-    Object.keys(config).forEach((key) => {
-      const shouldBeVisible = values.includes(key)
-      if ((visible[key] ?? true) !== shouldBeVisible) {
-        toggleVisible(key)
-      }
-    })
-  }
+  // ---------------------------------------------------------------------------
+  // Doc type visibility
+  // ---------------------------------------------------------------------------
 
   function buildFilters() {
     const filters: any[] = []
@@ -148,55 +140,38 @@ export default function SearchNavbar() {
 
   return (
     <>
-      <nav className="sticky top-16 z-40 mt-16 flex items-center gap-4 px-4 bg-background border-b flex-wrap">
-        <form onSubmit={onSearch} className="flex items-center gap-2 flex-1">
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search..."
-              className="h-8 w-full pl-8 pr-12"
-            />
-            <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-              ⌘K
-            </kbd>
-          </div>
-        </form>
-
+      <nav className="sticky top-16 z-40 mt-16 flex items-center gap-4 px-4 py-2 bg-background border-b flex-wrap">
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm">
-              Series
+              Types
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-56 p-0">
             <ScrollArea className="h-40 p-2">
-              <ToggleGroup
-                type="multiple"
-                variant="outline"
-                className="flex flex-col gap-2"
-                value={activeSeries}
-                onValueChange={handleSeriesChange}
-              >
+              <div className="flex flex-col gap-2">
                 {Object.entries(config).map(([key, { label, color }]) => (
-                  <ToggleGroupItem
+                  <label
                     key={key}
-                    value={key}
-                    className="justify-start text-xs"
-                    style=
-                      {visible[key]
-                        ? {
-                            background: color,
-                            color: "hsl(var(--background))",
-                            borderColor: color,
-                          }
-                        : { borderColor: color }}
+                    className="flex items-center gap-2 text-xs cursor-pointer"
                   >
+                    <input
+                      type="checkbox"
+                      checked={visible[key] !== false}
+                      onChange={() => toggleVisible(key)}
+                      className="peer hidden"
+                    />
+                    <span className="flex h-4 w-4 items-center justify-center rounded-full border border-input">
+                      <span className="hidden h-2 w-2 rounded-full bg-primary peer-checked:block" />
+                    </span>
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ background: color }}
+                    />
                     {label}
-                  </ToggleGroupItem>
+                  </label>
                 ))}
-              </ToggleGroup>
+              </div>
             </ScrollArea>
           </PopoverContent>
         </Popover>
@@ -250,6 +225,24 @@ export default function SearchNavbar() {
             </PopoverContent>
           </Popover>
         </div>
+
+        <form
+          onSubmit={onSearch}
+          className="ml-auto flex items-center gap-2 w-full max-w-md"
+        >
+          <div className="relative w-full">
+            <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search..."
+              className="h-8 w-full pl-8 pr-12"
+            />
+            <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+              ⌘K
+            </kbd>
+          </div>
+        </form>
       </nav>
       <CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>
         <CommandInput placeholder="Search results" />
