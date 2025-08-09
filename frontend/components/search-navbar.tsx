@@ -181,7 +181,12 @@ export default function SearchNavbar() {
           <ToggleGroup
             type="single"
             value={rangeOption === "custom" ? undefined : rangeOption}
-            onValueChange={(val) => val && setRangeOption(val as RangeOption)}
+            onValueChange={(val) => {
+              if (val) {
+                setRangeOption(val as RangeOption)
+                setCustomRange(undefined)
+              }
+            }}
             variant="outline"
             size="sm"
             className="flex"
@@ -192,7 +197,7 @@ export default function SearchNavbar() {
               ["lastYear", "Last Year"],
               ["30days", "30 Days"],
             ] as [RangeOption, string][]).map(([key, label]) => (
-              <ToggleGroupItem key={key} value={key}>
+              <ToggleGroupItem key={key} value={key} className="flex-none w-24">
                 {label}
               </ToggleGroupItem>
             ))}
