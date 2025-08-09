@@ -1,31 +1,31 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
 import { useDocumentsChart } from "@/components/documents-chart-context"
+import DocumentItem from "@/components/document-item"
 
 interface VectorStore {
   id: string
   name: string
 }
 
-export default function SearchResults() {
+interface ExternalDoc {
+  id?: string | number
+  title: string
+  type?: number
+  date?: string
+  snippet?: string
+  score?: number
+}
+
+export default function SearchResults({
+  externalResults = [],
+  clearExternal,
+}: {
+  externalResults?: ExternalDoc[]
+  clearExternal: () => void
+}) {
   const searchParams = useSearchParams()
   const query = searchParams.get("q")?.trim() || ""
 
@@ -87,8 +87,7 @@ export default function SearchResults() {
       start = past.toISOString().split("T")[0]
       end = today.toISOString().split("T")[0]
     }
-    if (start)
-      filters.push({ type: "gte", key: "date", value: start })
+    if (start) filters.push({ type: "gte", key: "date", value: start })
     if (end) filters.push({ type: "lte", key: "date", value: end })
 
     if (filters.length === 0) return undefined
@@ -122,54 +121,58 @@ export default function SearchResults() {
     })()
   }, [query, vectorStores, rangeOption, customRange, visible])
 
-  if (!query) return null
+  useEffect(() => {
+    if (query) clearExternal()
+  }, [query, clearExternal])
+
+  const idToLabel = useMemo(() => {
+    const map: Record<number, string> = {}
+    Object.entries(typeLabelToId).forEach(([label, id]) => {
+      map[id] = label
+    })
+    return map
+  }, [typeLabelToId])
+
+  const items = (query ? results : externalResults).map((r, i) => {
+    if (query) {
+      const title = r?.metadata?.title || `Result ${i + 1}`
+      const date = r?.metadata?.resmi_gazete_tarihi || r?.metadata?.date || ""
+      const typeLabel = idToLabel[r?.metadata?.mevzuat_tur as number]
+      const fullSnippet =
+        r?.content?.map((c: any) => c.text).join(" ") || r?.snippet || ""
+      const snippet =
+        fullSnippet.length > 200 ? fullSnippet.slice(0, 200) + "..." : fullSnippet
+      const pdfUrl = buildPdfUrl(r?.metadata)
+      const score = r?.score
+      return {
+        title,
+        date,
+        type: typeLabel,
+        snippet,
+        fullSnippet,
+        pdfUrl,
+        score,
+      }
+    } else {
+      const typeLabel = r.type !== undefined ? idToLabel[r.type] : undefined
+      return {
+        title: r.title,
+        date: r.date,
+        type: typeLabel,
+        snippet: r.snippet,
+        score: r.score,
+      }
+    }
+  })
+
+  if (!query && externalResults.length === 0) return null
 
   return (
     <div className="mt-6 space-y-4">
       {loading ? (
         <div>Searching...</div>
-      ) : results.length > 0 ? (
-        results.map((r, i) => {
-          const title = r?.metadata?.title || `Result ${i + 1}`
-          const date =
-            r?.metadata?.resmi_gazete_tarihi || r?.metadata?.date || ""
-          const fullSnippet =
-            r?.content?.map((c: any) => c.text).join(" ") || r?.snippet || ""
-          const shortSnippet =
-            fullSnippet.length > 200
-              ? fullSnippet.slice(0, 200) + "..."
-              : fullSnippet
-
-          const pdfUrl = buildPdfUrl(r?.metadata)
-
-          return (
-            <Dialog key={i}>
-              <DialogTrigger asChild>
-                <Card className="cursor-pointer">
-                  <CardHeader>
-                    <CardTitle>{title}</CardTitle>
-                    {date && <CardDescription>{date}</CardDescription>}
-                  </CardHeader>
-                  <CardContent>{shortSnippet}</CardContent>
-                </Card>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{title}</DialogTitle>
-                  {date && <DialogDescription>{date}</DialogDescription>}
-                </DialogHeader>
-                <div className="whitespace-pre-wrap">{fullSnippet}</div>
-                {pdfUrl && (
-                  <Button asChild className="mt-4">
-                    <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
-                      Download PDF
-                    </a>
-                  </Button>
-                )}
-              </DialogContent>
-            </Dialog>
-          )
-        })
+      ) : items.length > 0 ? (
+        items.map((item, i) => <DocumentItem key={i} {...item} />)
       ) : (
         <div>No results found.</div>
       )}
