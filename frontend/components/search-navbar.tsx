@@ -1,14 +1,6 @@
 "use client"
 
 import { Search, Calendar as CalendarIcon } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import {
-  CommandDialog,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandItem,
-} from "@/components/ui/command"
 import {
   useDocumentsChart,
   RangeOption,
