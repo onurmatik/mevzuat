@@ -1,19 +1,33 @@
 "use client"
 
-import { Search } from "lucide-react"
-import { Input } from "@/components/ui/input"
+import { Search, Calendar as CalendarIcon } from "lucide-react"
 import {
-  CommandDialog,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandItem,
-} from "@/components/ui/command"
-import { useDocumentsChart } from "@/components/documents-chart-context"
+  useDocumentsChart,
+  RangeOption,
+} from "@/components/documents-chart-context"
 import { useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { Calendar } from "@/components/ui/calendar"
+import { format } from "date-fns"
 
 export default function SearchNavbar() {
-  const { visible, rangeOption, customRange, typeLabelToId } = useDocumentsChart()
+  const {
+    config,
+    visible,
+    toggleVisible,
+    rangeOption,
+    setRangeOption,
+    customRange,
+    setCustomRange,
+    typeLabelToId,
+  } = useDocumentsChart()
   const [query, setQuery] = useState("")
   const [commandOpen, setCommandOpen] = useState(false)
   const [vectorStores, setVectorStores] = useState<{ id: string; name: string }[]>([])
@@ -44,6 +58,19 @@ export default function SearchNavbar() {
     }
     fetchVectorStores()
   }, [])
+
+  const activeSeries = Object.entries(visible)
+    .filter(([, v]) => v)
+    .map(([k]) => k)
+
+  function handleSeriesChange(values: string[]) {
+    Object.keys(config).forEach((key) => {
+      const shouldBeVisible = values.includes(key)
+      if ((visible[key] ?? true) !== shouldBeVisible) {
+        toggleVisible(key)
+      }
+    })
+  }
 
   function buildFilters() {
     const filters: any[] = []
@@ -121,8 +148,8 @@ export default function SearchNavbar() {
 
   return (
     <>
-      <nav className="sticky top-16 z-40 mt-16 flex items-center gap-2 px-4 h-16 bg-background border-b">
-        <form onSubmit={onSearch} className="flex items-center gap-2 w-full">
+      <nav className="sticky top-16 z-40 mt-16 flex items-center gap-4 px-4 bg-background border-b flex-wrap">
+        <form onSubmit={onSearch} className="flex items-center gap-2 flex-1">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -136,6 +163,93 @@ export default function SearchNavbar() {
             </kbd>
           </div>
         </form>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm">
+              Series
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-0">
+            <ScrollArea className="h-40 p-2">
+              <ToggleGroup
+                type="multiple"
+                variant="outline"
+                className="flex flex-col gap-2"
+                value={activeSeries}
+                onValueChange={handleSeriesChange}
+              >
+                {Object.entries(config).map(([key, { label, color }]) => (
+                  <ToggleGroupItem
+                    key={key}
+                    value={key}
+                    className="justify-start text-xs"
+                    style=
+                      {visible[key]
+                        ? {
+                            background: color,
+                            color: "hsl(var(--background))",
+                            borderColor: color,
+                          }
+                        : { borderColor: color }}
+                  >
+                    {label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </ScrollArea>
+          </PopoverContent>
+        </Popover>
+
+        <div className="flex items-center gap-2">
+          <ToggleGroup
+            type="single"
+            value={rangeOption === "custom" ? undefined : rangeOption}
+            onValueChange={(val) => val && setRangeOption(val as RangeOption)}
+            variant="outline"
+            size="sm"
+            className="flex"
+          >
+            {([
+              ["all", "All"],
+              ["thisYear", "This Year"],
+              ["lastYear", "Last Year"],
+              ["30days", "30 Days"],
+            ] as [RangeOption, string][]).map(([key, label]) => (
+              <ToggleGroupItem key={key} value={key}>
+                {label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={rangeOption === "custom" ? "default" : "outline"}
+                size="sm"
+                className="justify-start text-left font-normal w-[240px]"
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {customRange?.from && customRange?.to
+                  ? `${format(customRange.from, "LLL dd, y")} - ${format(customRange.to, "LLL dd, y")}`
+                  : "Custom"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="p-0" align="start">
+              <Calendar
+                mode="range"
+                numberOfMonths={2}
+                selected={customRange}
+                onSelect={(range) => {
+                  setCustomRange(range)
+                  if (range?.from && range.to) {
+                    setRangeOption("custom")
+                  }
+                }}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
       </nav>
       <CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>
         <CommandInput placeholder="Search results" />
