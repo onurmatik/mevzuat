@@ -116,5 +116,6 @@ class Document(models.Model):
     def convert_pdf_to_markdown(self, overwrite=False):
         return self._fetcher().convert_pdf_to_markdown(self, overwrite=overwrite)
 
-    def upload_to_vectorstore(self):
-        return self._fetcher().upload_to_vectorstore(self)
+    def sync_with_vectorstore(self):
+        """Synchronise this document with the configured vector store."""
+        return self._fetcher().sync_with_vectorstore(self)

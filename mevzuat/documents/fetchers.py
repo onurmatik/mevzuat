@@ -62,22 +62,17 @@ class BaseDocFetcher(abc.ABC):
 
         return doc.markdown
 
-    def upload_to_vectorstore(self, doc):
-        """Upload the document to the configured OpenAI vector store.
+    def sync_with_vectorstore(self, doc):
+        """Synchronise the document with the configured OpenAI vector store.
 
-        The file is first uploaded to OpenAI and then attached to the
-        vector store returned by :meth:`get_vectorstore_id`.
-
-        Parameters
-        ----------
-        client : openai.OpenAI, optional
-            An existing OpenAI client instance. If ``None`` a new client will
-            be created using default configuration.
+        If the document was never uploaded before a new OpenAI file is
+        created and attached to the vector store. When the document already
+        has an ``oai_file_id`` only its attributes are updated.
 
         Returns
         -------
         str
-            The uploaded OpenAI file id.
+            The OpenAI file id associated with the document.
 
         Raises
         ------
@@ -92,13 +87,6 @@ class BaseDocFetcher(abc.ABC):
 
         client = OpenAI()
 
-        # Upload the file to OpenAI first.
-        with open(doc.document.path, "rb") as f:
-            uploaded_file = client.files.create(file=f, purpose="user_data")
-
-        doc.oai_file_id = uploaded_file.id
-        doc.save(update_fields=["oai_file_id"])
-
         # Build the attributes
         attributes = {
             "date": doc.date.strftime("%Y-%m-%d"),
@@ -106,8 +94,25 @@ class BaseDocFetcher(abc.ABC):
         }
         attributes.update(doc.metadata)
 
-        # Attach the uploaded file to the vector store
         vector_store_id = doc.get_vectorstore_id()
+
+        if doc.oai_file_id:
+            # Update only the attributes on the existing file
+            client.vector_stores.files.update(
+                vector_store_id=vector_store_id,
+                file_id=doc.oai_file_id,
+                attributes=attributes,
+            )
+            return doc.oai_file_id
+
+        # Upload the file to OpenAI first
+        with open(doc.document.path, "rb") as f:
+            uploaded_file = client.files.create(file=f, purpose="user_data")
+
+        doc.oai_file_id = uploaded_file.id
+        doc.save(update_fields=["oai_file_id"])
+
+        # Attach the uploaded file to the vector store
         client.vector_stores.files.create(
             vector_store_id=vector_store_id,
             file_id=uploaded_file.id,
