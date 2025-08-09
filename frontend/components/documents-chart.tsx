@@ -35,17 +35,15 @@ interface CountRow {
   date: string
   [key: string]: number | string
 }
-
-export default function DocumentsChart() {
+export default function DocumentsChart({
+  onDocuments,
+}: {
+  onDocuments: (docs: Document[]) => void
+}) {
   const { config, visible, rangeOption, customRange, typeLabelToId } =
     useDocumentsChart()
   const [data, setData] = useState<CountRow[]>([])
   const [stacked, setStacked] = useState(false)
-  const [documents, setDocuments] = useState<Document[]>([])
-  const [selected, setSelected] = useState<{ date: string; type: string } | null>(
-    null,
-  )
-  const [error, setError] = useState<string | null>(null)
   const [interval, setInterval] = useState<"year" | "month" | "day">("year")
 
   const handleSelect = useCallback(
@@ -55,34 +53,26 @@ export default function DocumentsChart() {
       try {
         const d = new Date(date)
         const params = new URLSearchParams({ type: String(typeId) })
-        let label = ""
         if (interval === "day") {
-          const ds = d.toISOString().split("T")[0]
-          params.set("date", ds)
-          label = ds
+          params.set("date", d.toISOString().split("T")[0])
         } else if (interval === "month") {
           params.set("year", String(d.getFullYear()))
           params.set("month", String(d.getMonth() + 1))
-          label = d.toLocaleString(undefined, { month: "long", year: "numeric" })
         } else {
           params.set("year", String(d.getFullYear()))
-          label = String(d.getFullYear())
         }
         const res = await fetch(`/api/documents/list?${params.toString()}`)
         if (!res.ok) {
           throw new Error(`Request failed: ${res.status}`)
         }
         const docs: Document[] = await res.json()
-        setDocuments(docs)
-        setError(null)
-        setSelected({ date: label, type })
+        onDocuments(docs)
       } catch (err) {
         console.error(err)
-        setDocuments([])
-        setError("Failed to fetch documents")
+        onDocuments([])
       }
     },
-    [typeLabelToId, interval],
+    [typeLabelToId, interval, onDocuments],
   )
 
   /* -------------------------------------------------------------------------- */
@@ -143,7 +133,6 @@ export default function DocumentsChart() {
           a.date.localeCompare(b.date),
         )
         setData(sorted)
-        setSelected(null)
       } catch (err) {
         console.error(err)
       }
@@ -254,28 +243,6 @@ export default function DocumentsChart() {
           )}
         </ChartContainer>
       </CardContent>
-      {selected && (
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle>
-              {selected.type} ({selected.date})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {error ? (
-              <div>{error}</div>
-            ) : documents.length ? (
-              <ul className="list-disc pl-4">
-                {documents.map((doc) => (
-                  <li key={doc.id}>{doc.title}</li>
-                ))}
-              </ul>
-            ) : (
-              <div>No documents found.</div>
-            )}
-          </CardContent>
-        </Card>
-      )}
     </Card>
   )
 }
