@@ -211,7 +211,7 @@ export default function SearchNavbar() {
                   : "Custom"}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="p-0" align="start">
+            <PopoverContent className="w-auto p-0" align="start">
               <Calendar
                 mode="range"
                 numberOfMonths={2}
