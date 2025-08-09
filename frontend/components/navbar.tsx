@@ -79,7 +79,16 @@ export default function Navbar() {
       .map(([label]) => typeLabelToId[label])
       .filter(Boolean)
     if (typeIds.length) {
-      filters.push({ type: "in", key: "mevzuat_tur", value: typeIds })
+      const typeFilters = typeIds.map((id) => ({
+        type: "eq",
+        key: "mevzuat_tur",
+        value: id,
+      }))
+      filters.push(
+        typeFilters.length === 1
+          ? typeFilters[0]
+          : { type: "or", filters: typeFilters },
+      )
     }
 
     const today = new Date()
@@ -101,12 +110,13 @@ export default function Navbar() {
       start = past.toISOString().split("T")[0]
       end = today.toISOString().split("T")[0]
     }
-    if (start) filters.push({ type: "gte", key: "date", value: start })
+    if (start)
+      filters.push({ type: "gte", key: "date", value: start })
     if (end) filters.push({ type: "lte", key: "date", value: end })
 
     if (filters.length === 0) return undefined
     if (filters.length === 1) return filters[0]
-    return { type: "and", value: filters }
+    return { type: "and", filters }
   }
 
   async function onSearch(e: React.FormEvent<HTMLFormElement>) {
