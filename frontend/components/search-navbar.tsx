@@ -13,7 +13,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { Checkbox } from "@/components/ui/checkbox"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Calendar } from "@/components/ui/calendar"
 import { Input } from "@/components/ui/input"
@@ -148,32 +148,25 @@ export default function SearchNavbar() {
               Types
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-56 p-0">
-            <ScrollArea className="h-40 p-2">
-              <div className="flex flex-col gap-2">
-                {Object.entries(config).map(([key, { label, color }]) => (
-                  <label
-                    key={key}
-                    className="flex items-center gap-2 text-xs cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={visible[key] !== false}
-                      onChange={() => toggleVisible(key)}
-                      className="peer hidden"
-                    />
-                    <span className="flex h-4 w-4 items-center justify-center rounded-full border border-input">
-                      <span className="hidden h-2 w-2 rounded-full bg-primary peer-checked:block" />
-                    </span>
-                    <span
-                      className="h-2 w-2 rounded-full"
-                      style={{ background: color }}
-                    />
-                    {label}
-                  </label>
-                ))}
-              </div>
-            </ScrollArea>
+          <PopoverContent className="w-56 p-2">
+            <div className="flex flex-col gap-2">
+              {Object.entries(config).map(([key, { label, color }]) => (
+                <label
+                  key={key}
+                  className="flex items-center gap-2 text-xs cursor-pointer"
+                >
+                  <Checkbox
+                    checked={visible[key] !== false}
+                    onCheckedChange={() => toggleVisible(key)}
+                  />
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ background: color }}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
           </PopoverContent>
         </Popover>
 
