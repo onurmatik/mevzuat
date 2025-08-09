@@ -46,7 +46,7 @@ class DocumentAdmin(admin.ModelAdmin):
     actions = (
         "fetch_original",
         "convert_to_markdown",
-        "upload_to_vectorstore",
+        "sync_with_vectorstore",
     )
 
     def mevzuat_no(self, obj):
@@ -110,19 +110,23 @@ class DocumentAdmin(admin.ModelAdmin):
                 level=messages.WARNING,
             )
 
-    def upload_to_vectorstore(self, request, queryset):
+    def sync_with_vectorstore(self, request, queryset):
         ok, failed = 0, 0
         for obj in queryset:
-            obj.upload_to_vectorstore()
+            try:
+                obj.sync_with_vectorstore()
+                ok += 1
+            except Exception:
+                failed += 1
         if ok:
             self.message_user(
                 request,
-                f"Successfully uploaded {ok} document(s).",
+                f"Successfully synced {ok} document(s).",
                 level=messages.SUCCESS,
             )
         if failed:
             self.message_user(
                 request,
-                f"{failed} document(s) could not be uploaded – see log.",
+                f"{failed} document(s) could not be synced – see log.",
                 level=messages.WARNING,
             )
