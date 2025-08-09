@@ -21,6 +21,7 @@ class VectorStore(models.Model):
 
 class DocumentType(models.Model):
     name = models.CharField(max_length=100, unique=True)
+    short_name = models.CharField(max_length=100, unique=True, blank=True, null=True)
     slug = models.SlugField(unique=True, blank=True)
     description = models.TextField(blank=True)
     vector_store = models.ForeignKey(
