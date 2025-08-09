@@ -7,6 +7,7 @@ import {
 } from "@/components/documents-chart-context"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command"
 import {
   Popover,
   PopoverTrigger,
