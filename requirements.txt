@@ -5,3 +5,4 @@ docling
 openai
 django-ninja
 mcp
+fastmcp
