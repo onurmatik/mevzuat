@@ -29,13 +29,13 @@ npm install recharts
 
 ## MCP server
 
-The repository includes a simple [Model Context Protocol](https://github.com/modelcontextprotocol/standard) server that exposes stored Mevzuat documents to MCP-compliant agents. After installing backend dependencies and setting up the database, run:
+The repository includes a simple [Model Context Protocol](https://github.com/modelcontextprotocol/standard) server built with the [FastMCP](https://pypi.org/project/fastmcp/) framework. After installing backend dependencies and setting up the database, run:
 
 ```bash
-python scripts/mevzuat_mcp_server.py
+python -m mevzuat.mcp_server
 ```
 
-The server lists each document as a resource and returns the markdown content when available, falling back to JSON metadata otherwise.
+The server exposes tools for working with the stored legislation, including listing document types, returning document counts, listing documents and performing document searches.
 
 ## Contributing
 
