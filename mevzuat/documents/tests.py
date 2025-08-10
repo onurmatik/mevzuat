@@ -152,3 +152,61 @@ class VectorStoreSearchAPITest(TestCase):
             ranking_options=None,
             rewrite_query=True,
         )
+
+
+class DocumentSearchAPITest(TestCase):
+    def setUp(self):
+        self.vs1 = VectorStore.objects.create(name="VS1", oai_vs_id="vs1")
+        self.vs2 = VectorStore.objects.create(name="VS2", oai_vs_id="vs2")
+        DocumentType.objects.create(
+            id=1,
+            name="Kanun",
+            slug="kanun",
+            fetcher="MevzuatFetcher",
+            vector_store=self.vs1,
+        )
+        DocumentType.objects.create(
+            id=2,
+            name="Tüzük",
+            slug="tuzuk",
+            fetcher="MevzuatFetcher",
+            vector_store=self.vs2,
+        )
+
+    @patch("mevzuat.documents.api.OpenAI")
+    def test_search_across_vector_stores(self, MockOpenAI):
+        instance = MockOpenAI.return_value
+        instance.vector_stores.search.return_value = {"data": []}
+
+        response = self.client.get("/api/documents/search", {"query": "term"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(instance.vector_stores.search.call_count, 2)
+
+    @patch("mevzuat.documents.api.OpenAI")
+    def test_search_with_filters(self, MockOpenAI):
+        instance = MockOpenAI.return_value
+        instance.vector_stores.search.return_value = {"data": []}
+
+        params = {
+            "query": "term",
+            "type": "kanun",
+            "start_date": "2020-01-01",
+            "end_date": "2020-12-31",
+        }
+        response = self.client.get("/api/documents/search", params)
+        self.assertEqual(response.status_code, 200)
+
+        instance.vector_stores.search.assert_called_once()
+        args, kwargs = instance.vector_stores.search.call_args
+        self.assertEqual(kwargs["vector_store_id"], "vs1")
+        self.assertEqual(kwargs["query"], "term")
+        self.assertEqual(kwargs["max_num_results"], 10)
+        expected_filters = {
+            "type": "and",
+            "filters": [
+                {"type": "eq", "key": "type", "value": "kanun"},
+                {"type": "gte", "key": "date", "value": "2020-01-01"},
+                {"type": "lte", "key": "date", "value": "2020-12-31"},
+            ],
+        }
+        self.assertEqual(kwargs["filters"], expected_filters)

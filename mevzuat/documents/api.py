@@ -55,6 +55,88 @@ class DocumentTypeOut(Schema):
         from_attributes = True
 
 
+@router.get("/search")
+def search_documents(
+    request,
+    query: str = Query(..., description="Search query"),
+    type: Optional[str] = Query(None, description="Document type slug"),
+    date: Optional[date] = Query(None),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    score_threshold: Optional[float] = Query(None),
+    limit: int = Query(10),
+):
+    """Search documents across all vector stores.
+
+    ``query`` is required. Optional parameters allow filtering by document
+    type and date ranges without exposing the underlying vector stores.
+    """
+
+    # --- determine vector stores to search ----------------------------------
+    if type:
+        try:
+            dt = (
+                DocumentType.objects
+                .select_related("vector_store")
+                .get(slug=type, vector_store__isnull=False)
+            )
+        except DocumentType.DoesNotExist:
+            raise HttpError(404, "Document type not found")
+        vector_store_ids = [dt.vector_store.oai_vs_id]
+    else:
+        vector_store_ids = list(
+            DocumentType.objects
+            .filter(vector_store__isnull=False)
+            .values_list("vector_store__oai_vs_id", flat=True)
+            .distinct()
+        )
+
+        if not vector_store_ids:
+            raise HttpError(404, "No vector stores configured")
+
+    # --- build filter dictionary -------------------------------------------
+    filters: list[dict[str, Any]] = []
+    if type:
+        filters.append({"type": "eq", "key": "type", "value": type})
+    if date:
+        filters.append({"type": "eq", "key": "date", "value": date.isoformat()})
+    else:
+        if start_date:
+            filters.append({"type": "gte", "key": "date", "value": start_date.isoformat()})
+        if end_date:
+            filters.append({"type": "lte", "key": "date", "value": end_date.isoformat()})
+
+    filter_obj: Optional[dict[str, Any]]
+    if not filters:
+        filter_obj = None
+    elif len(filters) == 1:
+        filter_obj = filters[0]
+    else:
+        filter_obj = {"type": "and", "filters": filters}
+
+    client = OpenAI()
+    ranking_options = {}
+    if score_threshold is not None:
+        ranking_options["score_threshold"] = score_threshold
+
+    results: list[dict[str, Any]] = []
+    for vs_id in vector_store_ids:
+        search_kwargs = {
+            "vector_store_id": vs_id,
+            "query": query,
+            "max_num_results": limit,
+            "ranking_options": ranking_options or None,
+            "rewrite_query": True,
+        }
+        if filter_obj is not None:
+            search_kwargs["filters"] = filter_obj
+        response = client.vector_stores.search(**search_kwargs)
+        results.extend(response.get("data", []))
+
+    results.sort(key=lambda r: r.get("score", 0), reverse=True)
+    return {"data": results[:limit]}
+
+
 @router.post("/vector-stores/{vs_uuid}/search")
 def search_vector_store(
     request,
