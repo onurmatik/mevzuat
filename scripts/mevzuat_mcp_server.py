@@ -17,7 +17,7 @@ import django
 
 django.setup()
 
-from mevzuat.documents.models import Mevzuat  # noqa: E402
+from mevzuat.documents.models import Document  # noqa: E402
 
 
 server = Server("mevzuat")
@@ -25,27 +25,35 @@ server = Server("mevzuat")
 
 @server.list_resources()
 async def list_resources() -> list[types.Resource]:
-    """Return all Mevzuat entries as MCP resources."""
+    """Return all Document entries as MCP resources."""
     resources: list[types.Resource] = []
-    for doc in Mevzuat.objects.all():
+    for doc in Document.objects.all():
         uri = f"mevzuat://{doc.uuid}"
+        mime = "text/markdown" if doc.markdown else "application/json"
         resources.append(
-            types.Resource(uri=uri, description=doc.name, mimeType="application/json")
+            types.Resource(uri=uri, description=doc.title, mimeType=mime)
         )
     return resources
 
 
 @server.read_resource()
 async def read_resource(uri: AnyUrl):
-    """Return a JSON description of the requested Mevzuat record."""
+    """Return the content of the requested Document."""
     parsed = urlparse(str(uri))
     identifier = parsed.netloc or parsed.path.lstrip("/")
-    doc = Mevzuat.objects.get(uuid=identifier)
+    doc = Document.objects.get(uuid=identifier)
+
+    if doc.markdown:
+        with open(doc.markdown.path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return [ReadResourceContents(content=content, mime_type="text/markdown")]
+
     data = {
         "uuid": str(doc.uuid),
-        "name": doc.name,
-        "mevzuat_no": doc.mevzuat_no,
-        "mevzuat_tur": doc.mevzuat_tur,
+        "title": doc.title,
+        "document_type": doc.type.name if doc.type else None,
+        "date": doc.date.isoformat() if doc.date else None,
+        "metadata": doc.metadata,
     }
     content = json.dumps(data, ensure_ascii=False)
     return [ReadResourceContents(content=content, mime_type="application/json")]
