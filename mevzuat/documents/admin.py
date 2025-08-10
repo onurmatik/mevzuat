@@ -1,4 +1,5 @@
 from django.contrib import admin, messages
+from django.db.models import Q
 from .models import Document, VectorStore, DocumentType
 
 
@@ -12,9 +13,9 @@ class DocumentTypeAdmin(admin.ModelAdmin):
     list_display = ('name', 'slug', 'fetcher', 'document_count', 'vector_store')
 
 
-class HasDocumentFilter(admin.SimpleListFilter):
-    title = "Has document?"
-    parameter_name = "has_document"
+class HasPdfFilter(admin.SimpleListFilter):
+    title = "Has pdf?"
+    parameter_name = "has_pdf"
 
     def lookups(self, request, model_admin):
         return (("yes", "Yes"), ("no", "No"))
@@ -22,9 +23,41 @@ class HasDocumentFilter(admin.SimpleListFilter):
     def queryset(self, request, queryset):
         val = self.value()
         if val == "yes":
-            return queryset.exclude(document="")
+            return queryset.exclude(document="").exclude(document__isnull=True)
         if val == "no":
-            return queryset.filter(document="")
+            return queryset.filter(Q(document="") | Q(document__isnull=True))
+        return queryset
+
+
+class HasMdFilter(admin.SimpleListFilter):
+    title = "Has md?"
+    parameter_name = "has_md"
+
+    def lookups(self, request, model_admin):
+        return (("yes", "Yes"), ("no", "No"))
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        if val == "yes":
+            return queryset.exclude(markdown="").exclude(markdown__isnull=True)
+        if val == "no":
+            return queryset.filter(Q(markdown="") | Q(markdown__isnull=True))
+        return queryset
+
+
+class InVectorStoreFilter(admin.SimpleListFilter):
+    title = "In vector store?"
+    parameter_name = "in_vs"
+
+    def lookups(self, request, model_admin):
+        return (("yes", "Yes"), ("no", "No"))
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        if val == "yes":
+            return queryset.exclude(oai_file_id="").exclude(oai_file_id__isnull=True)
+        if val == "no":
+            return queryset.filter(Q(oai_file_id="") | Q(oai_file_id__isnull=True))
         return queryset
 
 
@@ -40,7 +73,11 @@ class DocumentAdmin(admin.ModelAdmin):
         "has_md",
     )
     list_filter = (
-        "type", "date"
+        "type",
+        "date",
+        HasPdfFilter,
+        InVectorStoreFilter,
+        HasMdFilter,
     )
     search_fields = ("metadata__mevzuat_no", "title")
     actions = (
