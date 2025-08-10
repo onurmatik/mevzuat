@@ -89,6 +89,7 @@ class BaseDocFetcher(abc.ABC):
 
         # Build the attributes
         attributes = {
+            "title": doc.title[:250],
             "date": doc.date.strftime("%Y-%m-%d"),
             "type": doc.type.slug,
         }
