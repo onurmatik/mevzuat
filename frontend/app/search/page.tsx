@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,7 @@ interface VectorStore {
   id: string
 }
 
-export default function SearchPage() {
+function SearchPageContent() {
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -73,8 +73,8 @@ export default function SearchPage() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ query }),
-          }).then((r) => r.json())
-        )
+          }).then((r) => r.json()),
+        ),
       )
       const combined = responses.flatMap((r) => r?.data || [])
       setResults(combined)
@@ -123,3 +123,12 @@ export default function SearchPage() {
     </div>
   )
 }
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={null}>
+      <SearchPageContent />
+    </Suspense>
+  )
+}
+

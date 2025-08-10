@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from "@/components/navbar";
 import SearchNavbar from "@/components/search-navbar";
 import { DocumentsChartProvider } from "@/components/documents-chart-context";
+import { Suspense } from "react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,7 +31,9 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <DocumentsChartProvider>
           <Navbar />
-          <SearchNavbar />
+          <Suspense fallback={null}>
+            <SearchNavbar />
+          </Suspense>
           <main>{children}</main>
         </DocumentsChartProvider>
       </body>
