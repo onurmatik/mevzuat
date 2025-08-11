@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from constructs import Construct
 from aws_cdk import (
