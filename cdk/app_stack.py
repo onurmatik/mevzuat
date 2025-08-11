@@ -1,19 +1,17 @@
 from pathlib import Path
-import base64
-
-from aws_cdk import (
-    Stack,
-    RemovalPolicy,
-    aws_ec2 as ec2,
-    aws_s3 as s3,
-    aws_iam as iam,
-    aws_ses as ses,
-    aws_ses_actions as ses_actions,
-    aws_route53 as route53,
-    aws_route53_targets as targets
-)
 from constructs import Construct
-
+from aws_cdk import (
+    Stack, Duration, RemovalPolicy
+)
+from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_route53 as route53
+from aws_cdk import aws_route53_targets as targets
+from aws_cdk import aws_cloudfront as cloudfront
+from aws_cdk import aws_cloudfront_origins as origins
+from aws_cdk import aws_certificatemanager as acm
+from aws_cdk import aws_s3_deployment as s3deploy
 
 # Manually create the Route 53 hosted zone
 #  and the key pair: https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#KeyPairs
@@ -87,14 +85,14 @@ class AppStack(Stack):
             "mkdir -p /home/ubuntu/mevzuat/cache",
 
             # Clone and set up the project
-            "sudo -u ubuntu git clone {repo_url} /home/ubuntu/mevzuat || true",
+            f"sudo -u ubuntu git clone {repo_url} /home/ubuntu/mevzuat || true",
             "sudo -u ubuntu python3 -m venv /home/ubuntu/mevzuat/venv",
             "sudo -u ubuntu /home/ubuntu/mevzuat/venv/bin/pip install --upgrade pip",
             "sudo -u ubuntu /home/ubuntu/mevzuat/venv/bin/pip install -r /home/ubuntu/mevzuat/requirements.txt",
 
             # Django setup
-            "sudo -u ubuntu /home/ubuntu/mevzuat/venv/bin/python manage.py migrate",
-            "sudo -u ubuntu /home/ubuntu/mevzuat/venv/bin/python manage.py collectstatic --noinput",
+            "cd /home/ubuntu/mevzuat && sudo -u ubuntu /home/ubuntu/mevzuat/venv/bin/python manage.py migrate",
+            "cd /home/ubuntu/mevzuat && sudo -u ubuntu /home/ubuntu/mevzuat/venv/bin/python manage.py collectstatic --noinput",
 
             # Gunicorn systemd setup
             "sudo tee /etc/systemd/system/mevzuat.service > /dev/null <<EOF",
@@ -139,9 +137,9 @@ class AppStack(Stack):
             "sudo systemctl enable redis-server",
             "sudo systemctl start redis-server",
             "sudo systemctl enable celery",
-            "sudo systemctl start celery"
+            "sudo systemctl start celery",
             "sudo systemctl enable mevzuat",
-            "sudo systemctl start mevzuat"
+            "sudo systemctl start mevzuat",
 
             # Nginx config
             "echo 'server {",
@@ -165,11 +163,9 @@ class AppStack(Stack):
             "sudo rm -f /etc/nginx/sites-enabled/default",
             "sudo nginx -t",
             "sudo systemctl restart nginx"
-
         )
 
-        # Ubuntu 24.04 LTS Canonical AMI; find using:
-        # aws ssm get-parameters --names /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+        # Ubuntu 24.04 LTS AMI
         ubuntu_ami = ec2.MachineImage.generic_linux({
             "us-east-1": "ami-0731becbf832f281e"
         })
@@ -184,10 +180,8 @@ class AppStack(Stack):
             user_data=user_data,
         )
 
-        # Allocate Elastic IP
+        # Elastic IP
         eip = ec2.CfnEIP(self, "AppElasticIP", domain="vpc")
-
-        # Associate it with the EC2 instance
         ec2.CfnEIPAssociation(
             self, "AppElasticIPAssoc",
             eip=eip.ref,
