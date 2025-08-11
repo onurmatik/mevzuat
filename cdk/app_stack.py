@@ -14,6 +14,7 @@ from aws_cdk import aws_cloudfront_origins as origins
 from aws_cdk import aws_certificatemanager as acm
 from aws_cdk import aws_s3_deployment as s3deploy
 
+
 # Manually create the Route 53 hosted zone
 #  and the key pair: https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#KeyPairs
 
