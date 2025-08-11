@@ -1,0 +1,487 @@
+{
+ "Resources": {
+  "AppDataBucket857FA106": {
+   "Type": "AWS::S3::Bucket",
+   "Properties": {
+    "VersioningConfiguration": {
+     "Status": "Enabled"
+    }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppDataBucket/Resource"
+   }
+  },
+  "AppVPCB7733741": {
+   "Type": "AWS::EC2::VPC",
+   "Properties": {
+    "CidrBlock": "10.0.0.0/16",
+    "EnableDnsHostnames": true,
+    "EnableDnsSupport": true,
+    "InstanceTenancy": "default",
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "TaletinkerAppStack/AppVPC"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppVPC/Resource"
+   }
+  },
+  "AppVPCPublicSubnet1Subnet5EAE38B2": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      0,
+      {
+       "Fn::GetAZs": ""
+      }
+     ]
+    },
+    "CidrBlock": "10.0.0.0/24",
+    "MapPublicIpOnLaunch": true,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Public"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Public"
+     },
+     {
+      "Key": "Name",
+      "Value": "TaletinkerAppStack/AppVPC/PublicSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AppVPCB7733741"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppVPC/PublicSubnet1/Subnet"
+   }
+  },
+  "AppVPCPublicSubnet1RouteTable63382DC5": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "TaletinkerAppStack/AppVPC/PublicSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AppVPCB7733741"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppVPC/PublicSubnet1/RouteTable"
+   }
+  },
+  "AppVPCPublicSubnet1RouteTableAssociation10038102": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "AppVPCPublicSubnet1RouteTable63382DC5"
+    },
+    "SubnetId": {
+     "Ref": "AppVPCPublicSubnet1Subnet5EAE38B2"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppVPC/PublicSubnet1/RouteTableAssociation"
+   }
+  },
+  "AppVPCPublicSubnet1DefaultRoute51A04DF7": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "AppVPCIGW7D765419"
+    },
+    "RouteTableId": {
+     "Ref": "AppVPCPublicSubnet1RouteTable63382DC5"
+    }
+   },
+   "DependsOn": [
+    "AppVPCVPCGW31CBD692"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppVPC/PublicSubnet1/DefaultRoute"
+   }
+  },
+  "AppVPCPublicSubnet2Subnet19F05CAF": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      1,
+      {
+       "Fn::GetAZs": ""
+      }
+     ]
+    },
+    "CidrBlock": "10.0.1.0/24",
+    "MapPublicIpOnLaunch": true,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Public"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Public"
+     },
+     {
+      "Key": "Name",
+      "Value": "TaletinkerAppStack/AppVPC/PublicSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AppVPCB7733741"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppVPC/PublicSubnet2/Subnet"
+   }
+  },
+  "AppVPCPublicSubnet2RouteTable3C9BB83A": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "TaletinkerAppStack/AppVPC/PublicSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AppVPCB7733741"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppVPC/PublicSubnet2/RouteTable"
+   }
+  },
+  "AppVPCPublicSubnet2RouteTableAssociationDB170019": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "AppVPCPublicSubnet2RouteTable3C9BB83A"
+    },
+    "SubnetId": {
+     "Ref": "AppVPCPublicSubnet2Subnet19F05CAF"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppVPC/PublicSubnet2/RouteTableAssociation"
+   }
+  },
+  "AppVPCPublicSubnet2DefaultRouteC200D8E4": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "AppVPCIGW7D765419"
+    },
+    "RouteTableId": {
+     "Ref": "AppVPCPublicSubnet2RouteTable3C9BB83A"
+    }
+   },
+   "DependsOn": [
+    "AppVPCVPCGW31CBD692"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppVPC/PublicSubnet2/DefaultRoute"
+   }
+  },
+  "AppVPCIGW7D765419": {
+   "Type": "AWS::EC2::InternetGateway",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "TaletinkerAppStack/AppVPC"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppVPC/IGW"
+   }
+  },
+  "AppVPCVPCGW31CBD692": {
+   "Type": "AWS::EC2::VPCGatewayAttachment",
+   "Properties": {
+    "InternetGatewayId": {
+     "Ref": "AppVPCIGW7D765419"
+    },
+    "VpcId": {
+     "Ref": "AppVPCB7733741"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppVPC/VPCGW"
+   }
+  },
+  "AppSG652848D9": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "TaletinkerAppStack/AppSG",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow SSH",
+      "FromPort": 22,
+      "IpProtocol": "tcp",
+      "ToPort": 22
+     },
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow HTTP",
+      "FromPort": 80,
+      "IpProtocol": "tcp",
+      "ToPort": 80
+     }
+    ],
+    "VpcId": {
+     "Ref": "AppVPCB7733741"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppSG/Resource"
+   }
+  },
+  "AppInstanceInstanceRole67BDC071": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ec2.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/AmazonSESFullAccess"
+       ]
+      ]
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "TaletinkerAppStack/AppInstance"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppInstance/InstanceRole/Resource"
+   }
+  },
+  "AppInstanceInstanceRoleDefaultPolicy41E4728A": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:GetObject*",
+        "s3:GetBucket*",
+        "s3:List*",
+        "s3:DeleteObject*",
+        "s3:PutObject",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention",
+        "s3:PutObjectTagging",
+        "s3:PutObjectVersionTagging",
+        "s3:Abort*"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "AppDataBucket857FA106",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "AppDataBucket857FA106",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "AppInstanceInstanceRoleDefaultPolicy41E4728A",
+    "Roles": [
+     {
+      "Ref": "AppInstanceInstanceRole67BDC071"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppInstance/InstanceRole/DefaultPolicy/Resource"
+   }
+  },
+  "AppInstanceInstanceProfileC6B6EFAA": {
+   "Type": "AWS::IAM::InstanceProfile",
+   "Properties": {
+    "Roles": [
+     {
+      "Ref": "AppInstanceInstanceRole67BDC071"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppInstance/InstanceProfile"
+   }
+  },
+  "AppInstance13C82D50": {
+   "Type": "AWS::EC2::Instance",
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      0,
+      {
+       "Fn::GetAZs": ""
+      }
+     ]
+    },
+    "IamInstanceProfile": {
+     "Ref": "AppInstanceInstanceProfileC6B6EFAA"
+    },
+    "ImageId": "ami-0731becbf832f281e",
+    "InstanceType": "t3.micro",
+    "KeyName": "taletinker-ec2-key",
+    "SecurityGroupIds": [
+     {
+      "Fn::GetAtt": [
+       "AppSG652848D9",
+       "GroupId"
+      ]
+     }
+    ],
+    "SubnetId": {
+     "Ref": "AppVPCPublicSubnet1Subnet5EAE38B2"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "TaletinkerAppStack/AppInstance"
+     }
+    ],
+    "UserData": {
+     "Fn::Base64": "#!/bin/bash\nyum update -y\nyum install -y git python3 python3-pip\npip3 install virtualenv\ncd /home/ec2-user\ngit clone https://github.com/onurmatik/tale-tinker.git taletinker || echo 'Repo already cloned'\ncd taletinker\npython3 -m venv venv\nsource venv/bin/activate\npip install -r requirements.txt\n# You can add commands to run your app here, e.g.:\n# uvicorn main:app --host 0.0.0.0 --port 80 &"
+    }
+   },
+   "DependsOn": [
+    "AppInstanceInstanceRoleDefaultPolicy41E4728A",
+    "AppInstanceInstanceRole67BDC071"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppInstance/Resource"
+   }
+  },
+  "AppElasticIP": {
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc"
+   },
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppElasticIP"
+   }
+  },
+  "AppElasticIPAssoc": {
+   "Type": "AWS::EC2::EIPAssociation",
+   "Properties": {
+    "EIP": {
+     "Ref": "AppElasticIP"
+    },
+    "InstanceId": {
+     "Ref": "AppInstance13C82D50"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/AppElasticIPAssoc"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/1VP0W6DMAz8lr6HrAPtA7pqqniLYOrrFDxX9YCkShxVKMq/jwJbtqc7n0++cynLfSn3O333BXz2xUCdjC1r6EWD3gYHKObdR/SVjK8BemRxvJiVJYFQyni+wUM7q6NQoRsI2tCZ1ZdZYwPju+4GzHrWDt5bIM1kza/5QWrD6GbnSTPe9bTFbNOB557XEQ2LFiE44unkbLgtAf+E2njWBraTmb/VaoM/BZIgPcrY2LXqgsrOby3xmf0cUs5eaMCUklATX615quRzJV92X56ocMEwjSibFb8B6zZl63ABAAA="
+   },
+   "Metadata": {
+    "aws:cdk:path": "TaletinkerAppStack/CDKMetadata/Default"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

@@ -121,10 +121,10 @@ AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
 
 if AWS_STORAGE_BUCKET_NAME:
     STORAGES = {
-        "default": {  # generated media files
+        "default": {  # documents
             "BACKEND": "storages.backends.s3.S3Storage",
             "OPTIONS": {
-                "location": "media",
+                "location": "docs",
                 "file_overwrite": False
             },
         },
@@ -140,7 +140,7 @@ if AWS_STORAGE_BUCKET_NAME:
 
     AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
     STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/static/"
-    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/media/"
+    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/docs/"
 
     AWS_QUERYSTRING_AUTH = False  # so URLs are public
     AWS_DEFAULT_ACL = None  # needed to avoid ACL errors
