@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from ninja import NinjaAPI
 from mevzuat.documents.api import router as documents_router
+from mevzuat.documents import views as document_views
 
 
 api = NinjaAPI()
@@ -26,5 +27,6 @@ api.add_router("/documents", documents_router)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('bootstrap/', document_views.main_bootstrap, name='bootstrap-main'),
     path("api/", api.urls),
 ]
