@@ -3,12 +3,12 @@ boto3
 aws-cdk-lib
 django
 python-slugify
+psycopg2-binary
 pgvector
 openai
 django-ninja
 django-storages
 mcp
 fastmcp
-
 # For pdf => md
 # docling
