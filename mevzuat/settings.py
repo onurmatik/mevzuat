@@ -17,9 +17,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-8cw96g!9*h9vb!*&rcq_ux+$%(@k65o*hj99_k%(e8rcevvvmb'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('AWS_STORAGE_BUCKET_NAME') == True
 
-ALLOWED_HOSTS = os.getenv('AWS_STORAGE_BUCKET_NAME') or []
+HOST_NAME = os.getenv('HOST_NAME')
+ALLOWED_HOSTS = [HOST_NAME] if HOST_NAME else []
 
 
 # Application definition
