@@ -51,7 +51,7 @@ ROOT_URLCONF = 'mevzuat.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'mevzuat' / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
