@@ -22,9 +22,11 @@ interface ExternalDoc {
 export default function SearchResults({
   externalResults = [],
   clearExternal,
+  onTypeCounts,
 }: {
   externalResults?: ExternalDoc[]
   clearExternal: () => void
+  onTypeCounts: (counts: Record<string, number>) => void
 }) {
   const searchParams = useSearchParams()
   const query = searchParams.get("q")?.trim() || ""
@@ -123,7 +125,7 @@ export default function SearchResults({
 
   useEffect(() => {
     if (query) clearExternal()
-  }, [query, clearExternal])
+  }, [query])
 
   const idToLabel = useMemo(() => {
     const map: Record<number, string> = {}
@@ -133,37 +135,60 @@ export default function SearchResults({
     return map
   }, [typeLabelToId])
 
-  const items = (query ? results : externalResults).map((r, i) => {
-    if (query) {
-      const title = r?.metadata?.title || `Result ${i + 1}`
-      const date = r?.metadata?.resmi_gazete_tarihi || r?.metadata?.date || ""
-      const typeLabel = idToLabel[r?.metadata?.mevzuat_tur as number]
-      const fullSnippet =
-        r?.content?.map((c: any) => c.text).join(" ") || r?.snippet || ""
-      const snippet =
-        fullSnippet.length > 200 ? fullSnippet.slice(0, 200) + "..." : fullSnippet
-      const pdfUrl = buildPdfUrl(r?.metadata)
-      const score = r?.score
-      return {
-        title,
-        date,
-        type: typeLabel,
-        snippet,
-        fullSnippet,
-        pdfUrl,
-        score,
+  const rawItems = useMemo(() => {
+    return (query ? results : externalResults).map((r, i) => {
+      if (query) {
+        const title = r?.metadata?.title || `Result ${i + 1}`
+        const date =
+          r?.metadata?.resmi_gazete_tarihi || r?.metadata?.date || ""
+        const typeLabel = idToLabel[r?.metadata?.mevzuat_tur as number]
+        const fullSnippet =
+          r?.content?.map((c: any) => c.text).join(" ") || r?.snippet || ""
+        const snippet =
+          fullSnippet.length > 200 ? fullSnippet.slice(0, 200) + "..." : fullSnippet
+        const pdfUrl = buildPdfUrl(r?.metadata)
+        const score = r?.score
+        return {
+          title,
+          date,
+          type: typeLabel,
+          snippet,
+          fullSnippet,
+          pdfUrl,
+          score,
+        }
+      } else {
+        const typeLabel = r.type !== undefined ? idToLabel[r.type] : undefined
+        return {
+          title: r.title,
+          date: r.date,
+          type: typeLabel,
+          snippet: r.snippet,
+          score: r.score,
+        }
       }
-    } else {
-      const typeLabel = r.type !== undefined ? idToLabel[r.type] : undefined
-      return {
-        title: r.title,
-        date: r.date,
-        type: typeLabel,
-        snippet: r.snippet,
-        score: r.score,
-      }
-    }
-  })
+    })
+  }, [query, results, externalResults, idToLabel])
+
+  const items = useMemo(
+    () =>
+      rawItems.filter(
+        (item) => item.type === undefined || visible[item.type] !== false,
+      ),
+    [rawItems, visible],
+  )
+
+  const counts = useMemo(() => {
+    const map: Record<string, number> = {}
+    items.forEach((item) => {
+      if (item.type) map[item.type] = (map[item.type] ?? 0) + 1
+    })
+    return map
+  }, [items])
+
+  useEffect(() => {
+    onTypeCounts(counts)
+  }, [counts])
 
   if (!query && externalResults.length === 0) return null
 
