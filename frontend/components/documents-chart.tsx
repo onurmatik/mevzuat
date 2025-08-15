@@ -37,11 +37,19 @@ interface CountRow {
 }
 export default function DocumentsChart({
   onDocuments,
+  typeCounts,
 }: {
   onDocuments: (docs: Document[]) => void
+  typeCounts: Record<string, number>
 }) {
-  const { config, visible, rangeOption, customRange, typeLabelToId } =
-    useDocumentsChart()
+  const {
+    config,
+    visible,
+    rangeOption,
+    customRange,
+    typeLabelToId,
+    toggleVisible,
+  } = useDocumentsChart()
   const [data, setData] = useState<CountRow[]>([])
   const [stacked, setStacked] = useState(false)
   const [interval, setInterval] = useState<"year" | "month" | "day">("year")
@@ -198,50 +206,71 @@ export default function DocumentsChart({
       </CardHeader>
 
       <CardContent>
-        <ChartContainer config={config}>
-          {data.length > 0 ? (
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={data}>
-                <CartesianGrid vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tickLine={false}
-                  tickFormatter={(value) => {
-                    const d = new Date(value)
-                    if (interval === "year") return String(d.getFullYear())
-                    if (interval === "month")
-                      return d.toLocaleDateString(undefined, {
-                        month: "short",
-                        year: "numeric",
-                      })
-                    return d.toLocaleDateString()
-                  }}
-                />
-                <YAxis tickLine={false} />
-                <Tooltip content={renderTooltip} />
+        <div className="grid gap-4 md:grid-cols-2">
+          <ChartContainer config={config}>
+            {data.length > 0 ? (
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={data}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    tickFormatter={(value) => {
+                      const d = new Date(value)
+                      if (interval === "year") return String(d.getFullYear())
+                      if (interval === "month")
+                        return d.toLocaleDateString(undefined, {
+                          month: "short",
+                          year: "numeric",
+                        })
+                      return d.toLocaleDateString()
+                    }}
+                  />
+                  <YAxis tickLine={false} />
+                  <Tooltip content={renderTooltip} />
 
-                {Object.entries(config)
-                  .filter(([key]) => visible[key] !== false)
-                  .map(([key, { color }]) => (
-                    <Bar
-                      key={key}
-                      dataKey={key}
-                      fill={color}
-                      isAnimationActive={false}
-                      {...(stacked ? { stackId: "docs" } : {})}
-                      onClick={({ payload }: any) =>
-                        handleSelect(payload?.date, key)
-                      }
-                    />
-                  ))}
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-[350px] items-center justify-center text-sm text-muted-foreground">
-              No data
-            </div>
-          )}
-        </ChartContainer>
+                  {Object.entries(config)
+                    .filter(([key]) => visible[key] !== false)
+                    .map(([key, { color }]) => (
+                      <Bar
+                        key={key}
+                        dataKey={key}
+                        fill={color}
+                        isAnimationActive={false}
+                        {...(stacked ? { stackId: "docs" } : {})}
+                        onClick={({ payload }: any) =>
+                          handleSelect(payload?.date, key)
+                        }
+                      />
+                    ))}
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-[350px] items-center justify-center text-sm text-muted-foreground">
+                No data
+              </div>
+            )}
+          </ChartContainer>
+          <div className="space-y-2 h-[350px] overflow-auto">
+            {Object.entries(config).map(([key, { label, color }]) => (
+              <div
+                key={key}
+                className={`flex items-center gap-2 cursor-pointer ${
+                  visible[key] === false ? "opacity-50" : ""
+                }`}
+                onClick={() => toggleVisible(key)}
+              >
+                <span
+                  className="inline-block h-2 w-2 rounded-sm"
+                  style={{ backgroundColor: color }}
+                />
+                <span>
+                  {label}: {typeCounts[key] ?? 0}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       </CardContent>
     </Card>
   )

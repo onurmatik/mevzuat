@@ -22,9 +22,11 @@ interface ExternalDoc {
 export default function SearchResults({
   externalResults = [],
   clearExternal,
+  onTypeCounts,
 }: {
   externalResults?: ExternalDoc[]
   clearExternal: () => void
+  onTypeCounts: (counts: Record<string, number>) => void
 }) {
   const searchParams = useSearchParams()
   const query = searchParams.get("q")?.trim() || ""
@@ -133,7 +135,7 @@ export default function SearchResults({
     return map
   }, [typeLabelToId])
 
-  const items = (query ? results : externalResults).map((r, i) => {
+  const rawItems = (query ? results : externalResults).map((r, i) => {
     if (query) {
       const title = r?.metadata?.title || `Result ${i + 1}`
       const date = r?.metadata?.resmi_gazete_tarihi || r?.metadata?.date || ""
@@ -164,6 +166,22 @@ export default function SearchResults({
       }
     }
   })
+
+  const items = rawItems.filter(
+    (item) => item.type === undefined || visible[item.type] !== false,
+  )
+
+  const counts = useMemo(() => {
+    const map: Record<string, number> = {}
+    items.forEach((item) => {
+      if (item.type) map[item.type] = (map[item.type] ?? 0) + 1
+    })
+    return map
+  }, [items])
+
+  useEffect(() => {
+    onTypeCounts(counts)
+  }, [counts, onTypeCounts])
 
   if (!query && externalResults.length === 0) return null
 
