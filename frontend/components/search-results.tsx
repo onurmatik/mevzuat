@@ -190,6 +190,22 @@ export default function SearchResults({
     onTypeCounts(counts)
   }, [counts])
 
+  const items = rawItems.filter(
+    (item) => item.type === undefined || visible[item.type] !== false,
+  )
+
+  const counts = useMemo(() => {
+    const map: Record<string, number> = {}
+    items.forEach((item) => {
+      if (item.type) map[item.type] = (map[item.type] ?? 0) + 1
+    })
+    return map
+  }, [items])
+
+  useEffect(() => {
+    onTypeCounts(counts)
+  }, [counts, onTypeCounts])
+
   if (!query && externalResults.length === 0) return null
 
   return (
