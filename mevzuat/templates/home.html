@@ -3,10 +3,214 @@
 {% block title %}Mevzuat{% endblock %}
 
 {% block extra_css %}
+<style>
+  .legend-item { display: flex; align-items: center; margin-bottom: .25rem; }
+  .legend-color { width: 12px; height: 12px; display: inline-block; margin-right: .5rem; border-radius: 2px; }
+</style>
 {% endblock %}
 
 {% block content %}
+<nav class="navbar navbar-expand-lg bg-body-tertiary rounded mb-4">
+  <div class="container-fluid">
+    <div class="dropdown me-2">
+      <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        Types
+      </button>
+      <ul class="dropdown-menu" id="typeFilter"></ul>
+    </div>
+
+    <select class="form-select me-2" style="max-width:150px;" id="rangeSelect">
+      <option value="all">All</option>
+      <option value="thisYear">This Year</option>
+      <option value="lastYear">Last Year</option>
+      <option value="30days">30 Days</option>
+      <option value="custom">Custom</option>
+    </select>
+
+    <input type="date" class="form-control me-2 d-none" id="startDate">
+    <input type="date" class="form-control me-2 d-none" id="endDate">
+
+    <form class="d-flex ms-auto" id="searchForm">
+      <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search" id="searchInput">
+      <button class="btn btn-outline-success" type="submit">Search</button>
+    </form>
+  </div>
+</nav>
+
+<div id="searchResults" class="mb-4"></div>
+
+<div class="row">
+  <div class="col-lg-8">
+    <canvas id="documentsChart" height="350"></canvas>
+  </div>
+  <div class="col-lg-4">
+    <div id="chartLegend" class="small"></div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const palette = ['#0d6efd','#6c757d','#198754','#dc3545','#ffc107','#0dcaf0','#6610f2','#d63384','#20c997','#fd7e14'];
+    const typeFilter = document.getElementById('typeFilter');
+    const rangeSelect = document.getElementById('rangeSelect');
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    const legend = document.getElementById('chartLegend');
+    const searchForm = document.getElementById('searchForm');
+    const searchInput = document.getElementById('searchInput');
+    const resultsDiv = document.getElementById('searchResults');
+    let chart;
+    const typeMap = {}; // label -> {id, color, visible}
+
+    loadTypes();
+
+    async function loadTypes() {
+      try {
+        const res = await fetch('/api/documents/types');
+        const types = await res.json();
+        types.forEach((t, idx) => {
+          typeMap[t.label] = { id: t.id, color: palette[idx % palette.length], visible: true };
+          const li = document.createElement('li');
+          li.innerHTML = `<label class="dropdown-item"><input type="checkbox" class="form-check-input me-2" data-label="${t.label}" checked> ${t.label}</label>`;
+          typeFilter.appendChild(li);
+        });
+        document.querySelectorAll('#typeFilter input[type="checkbox"]').forEach(cb => {
+          cb.addEventListener('change', () => {
+            const label = cb.getAttribute('data-label');
+            typeMap[label].visible = cb.checked;
+            updateChart();
+          });
+        });
+        updateChart();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function getRange() {
+      const opt = rangeSelect.value;
+      const today = new Date();
+      let start = '', end = '', interval = 'year';
+      if (opt === 'thisYear') {
+        start = `${today.getFullYear()}-01-01`;
+        end = today.toISOString().split('T')[0];
+        interval = 'month';
+      } else if (opt === 'lastYear') {
+        const year = today.getFullYear() - 1;
+        start = `${year}-01-01`;
+        end = `${year}-12-31`;
+        interval = 'month';
+      } else if (opt === '30days') {
+        const past = new Date();
+        past.setDate(today.getDate() - 30);
+        start = past.toISOString().split('T')[0];
+        end = today.toISOString().split('T')[0];
+        interval = 'day';
+      } else if (opt === 'custom') {
+        start = startDateInput.value;
+        end = endDateInput.value;
+        interval = 'day';
+      }
+      return { start, end, interval };
+    }
+
+    async function fetchCounts() {
+      const { start, end, interval } = getRange();
+      const params = new URLSearchParams();
+      params.set('interval', interval);
+      if (start) params.set('start_date', start);
+      if (end) params.set('end_date', end);
+      const res = await fetch('/api/documents/counts?' + params.toString());
+      return await res.json();
+    }
+
+    async function updateChart() {
+      const rows = await fetchCounts();
+      const visibleLabels = Object.keys(typeMap).filter(k => typeMap[k].visible);
+      const periods = Array.from(new Set(rows.map(r => r.period))).sort();
+      const datasetMap = {};
+      visibleLabels.forEach(l => datasetMap[l] = Array(periods.length).fill(0));
+      rows.forEach(r => {
+        const idx = periods.indexOf(r.period);
+        if (idx !== -1 && datasetMap[r.type] !== undefined) {
+          datasetMap[r.type][idx] = r.count;
+        }
+      });
+      const datasets = visibleLabels.map(l => ({
+        label: l,
+        data: datasetMap[l],
+        backgroundColor: typeMap[l].color,
+        stack: 'docs'
+      }));
+      const ctx = document.getElementById('documentsChart');
+      if (!chart) {
+        chart = new Chart(ctx, {
+          type: 'bar',
+          data: { labels: periods, datasets },
+          options: {
+            responsive: true,
+            scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+          }
+        });
+      } else {
+        chart.data.labels = periods;
+        chart.data.datasets = datasets;
+        chart.update();
+      }
+      updateLegend(rows, periods);
+    }
+
+    function updateLegend(rows, periods) {
+      if (!rows.length) {
+        legend.innerHTML = '<p>No data</p>';
+        return;
+      }
+      const totals = {};
+      rows.forEach(r => {
+        totals[r.type] = (totals[r.type] || 0) + r.count;
+      });
+      const first = periods[0];
+      const last = periods[periods.length - 1];
+      let html = `<div class="mb-2"><strong>Date Range:</strong> ${first} – ${last}</div>`;
+      html += '<ul class="list-unstyled">';
+      Object.keys(typeMap).forEach(label => {
+        if (typeMap[label].visible) {
+          html += `<li class="legend-item"><span class="legend-color" style="background:${typeMap[label].color}"></span>${label}: ${totals[label] || 0}</li>`;
+        }
+      });
+      html += '</ul>';
+      legend.innerHTML = html;
+    }
+
+    rangeSelect.addEventListener('change', () => {
+      const custom = rangeSelect.value === 'custom';
+      startDateInput.classList.toggle('d-none', !custom);
+      endDateInput.classList.toggle('d-none', !custom);
+      updateChart();
+    });
+    startDateInput.addEventListener('change', () => updateChart());
+    endDateInput.addEventListener('change', () => updateChart());
+
+    searchForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const q = searchInput.value.trim();
+      if (!q) return;
+      const params = new URLSearchParams({ query: q });
+      const { start, end } = getRange();
+      if (start) params.set('start_date', start);
+      if (end) params.set('end_date', end);
+      const res = await fetch('/api/documents/search?' + params.toString());
+      if (!res.ok) return;
+      const docs = await res.json();
+      if (!Array.isArray(docs) || !docs.length) {
+        resultsDiv.innerHTML = '<div class="alert alert-warning">No results</div>';
+      } else {
+        resultsDiv.innerHTML = '<ul class="list-group mb-4">' + docs.map(d => `<li class="list-group-item">${d.title}</li>`).join('') + '</ul>';
+      }
+    });
+  });
+</script>
 {% endblock %}
