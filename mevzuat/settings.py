@@ -17,7 +17,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-8cw96g!9*h9vb!*&rcq_ux+$%(@k65o*hj99_k%(e8rcevvvmb'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('AWS_STORAGE_BUCKET_NAME') == True
+DEBUG = os.getenv('DEBUG') == 'True'
 
 HOST_NAME = os.getenv('HOST_NAME')
 ALLOWED_HOSTS = [HOST_NAME] if HOST_NAME else []
@@ -142,13 +142,16 @@ if AWS_STORAGE_BUCKET_NAME:
 else:
     # Local dev setup
     STATIC_URL = "/static/"
-    STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+    STATIC_ROOT = BASE_DIR / "staticfiles"
 
     MEDIA_URL = "/media/"
-    MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+    MEDIA_ROOT = BASE_DIR / "media"
 
 # Static files directory for development
-STATICFILES_DIRS = (os.path.join(BASE_DIR, 'static'),)
+STATICFILES_DIRS = [
+    BASE_DIR / "frontend" / "out",
+    BASE_DIR / "static",
+]
 
 
 # Default primary key field type
