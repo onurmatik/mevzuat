@@ -2,9 +2,7 @@ import abc
 import os
 from typing import Type
 from datetime import datetime
-from urllib.parse import urlparse
 import requests
-from docling.document_converter import DocumentConverter
 from django.core.files.base import ContentFile
 from django.db import transaction, models
 
@@ -44,6 +42,9 @@ class BaseDocFetcher(abc.ABC):
         ValueError
             If ``self.document`` is empty.
         """
+
+        from docling.document_converter import DocumentConverter
+
         if doc.markdown and not overwrite:
             return doc.markdown
 
