@@ -143,7 +143,6 @@ def search_documents(
                 })
 
     results.sort(key=lambda r: r.get("score", 0), reverse=True)
-    print(results)
     return {"data": results[:limit]}
 
 
