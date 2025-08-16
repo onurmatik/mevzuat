@@ -5,7 +5,6 @@ from django.core.exceptions import ValidationError
 
 from pgvector.django import VectorField, L2Distance, HnswIndex, HalfVectorField
 from django.db import models
-from django.conf import settings
 from slugify import slugify
 
 
@@ -57,7 +56,7 @@ class Document(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False)
     type = models.ForeignKey(DocumentType, on_delete=models.SET_NULL, null=True, blank=True, related_name='documents')
 
-    title = models.CharField(max_length=300)
+    title = models.CharField(max_length=1000)
     date = models.DateField(blank=True, null=True)  # The significant date for the doc; e.g.: effective date, pub date, etc.
 
     document = models.FileField(upload_to=document_upload_to, blank=True, null=True)
