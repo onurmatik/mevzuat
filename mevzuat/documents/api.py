@@ -72,7 +72,7 @@ def search_documents(
     type and date ranges without exposing the underlying vector stores.
     """
 
-    # --- determine vector stores to search ----------------------------------
+    # determine vector stores to search
     if type:
         try:
             dt = (
@@ -94,7 +94,7 @@ def search_documents(
         if not vector_store_ids:
             raise HttpError(404, "No vector stores configured")
 
-    # --- build filter dictionary -------------------------------------------
+    # build filter dictionary
     filters: list[dict[str, Any]] = []
     if type:
         filters.append({"type": "eq", "key": "type", "value": type})
@@ -132,13 +132,18 @@ def search_documents(
             search_kwargs["filters"] = filter_obj
         response = client.vector_stores.search(**search_kwargs)
 
-        # ``vector_stores.search`` returns a ``SyncPage`` whose ``data`` attribute
-        # contains ``VectorStoreSearchResponse`` objects.  Convert each item to a
-        # plain dictionary for downstream sorting and serialization.
-        items = [item.model_dump() for item in response.data]
-        results.extend(items)
+        for item in response.data:
+            for c in item.content:
+                results.append({
+                    "text": c.text,
+                    "type": c.type,
+                    "filename": item.filename,
+                    "score": item.score,
+                    "attributes": item.attributes
+                })
 
     results.sort(key=lambda r: r.get("score", 0), reverse=True)
+    print(results)
     return {"data": results[:limit]}
 
 
