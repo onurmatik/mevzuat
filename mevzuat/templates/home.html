@@ -63,7 +63,17 @@
     const searchInput = document.getElementById('searchInput');
     const resultsDiv = document.getElementById('searchResults');
     let chart;
-    const typeMap = {}; // label -> {id, color, visible}
+    const typeMap = {}; // label -> {id, slug, color, visible}
+
+    function slugify(str) {
+      return str
+        .toString()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    }
 
     loadTypes();
 
@@ -72,7 +82,8 @@
         const res = await fetch('/api/documents/types');
         const types = await res.json();
         types.forEach((t, idx) => {
-          typeMap[t.label] = { id: t.id, color: palette[idx % palette.length], visible: true };
+          const slug = slugify(t.label);
+          typeMap[t.label] = { id: t.id, slug, color: palette[idx % palette.length], visible: true };
           const li = document.createElement('li');
           li.innerHTML = `<label class="dropdown-item"><input type="checkbox" class="form-check-input me-2" data-label="${t.label}" checked> ${t.label}</label>`;
           typeFilter.appendChild(li);
@@ -198,13 +209,22 @@
       e.preventDefault();
       const q = searchInput.value.trim();
       if (!q) return;
+      const selectedSlugs = Object.keys(typeMap)
+        .filter(label => typeMap[label].visible)
+        .map(label => typeMap[label].slug);
       const params = new URLSearchParams({ query: q });
       const { start, end } = getRange();
       if (start) params.set('start_date', start);
       if (end) params.set('end_date', end);
+      if (selectedSlugs.length === 1) {
+        params.set('type', selectedSlugs[0]);
+      }
       const res = await fetch('/api/documents/search?' + params.toString());
       if (!res.ok) return;
-      const { data } = await res.json();
+      let { data } = await res.json();
+      if (selectedSlugs.length > 1) {
+        data = data.filter(d => selectedSlugs.includes(d.attributes?.type));
+      }
       if (!Array.isArray(data) || !data.length) {
         resultsDiv.innerHTML = '<div class="alert alert-warning">No results</div>';
       } else {
