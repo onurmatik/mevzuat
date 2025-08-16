@@ -173,7 +173,12 @@ def search_documents(
         if filter_obj is not None:
             search_kwargs["filters"] = filter_obj
         response = client.vector_stores.search(**search_kwargs)
-        results.extend(response.get("data", []))
+
+        # ``vector_stores.search`` returns a ``SyncPage`` with the results on the
+        # ``data`` attribute.  Convert each ``VectorStoreSearchResponse`` to a
+        # plain dict so the output matches the REST API.
+        items = [item.model_dump() for item in response.data]
+        results.extend(items)
 
     results.sort(key=lambda r: r.get("score", 0), reverse=True)
     return {"data": results[:limit]}
