@@ -204,11 +204,19 @@
       if (end) params.set('end_date', end);
       const res = await fetch('/api/documents/search?' + params.toString());
       if (!res.ok) return;
-      const docs = await res.json();
-      if (!Array.isArray(docs) || !docs.length) {
+      const { data } = await res.json();
+      if (!Array.isArray(data) || !data.length) {
         resultsDiv.innerHTML = '<div class="alert alert-warning">No results</div>';
       } else {
-        resultsDiv.innerHTML = '<ul class="list-group mb-4">' + docs.map(d => `<li class="list-group-item">${d.title}</li>`).join('') + '</ul>';
+        resultsDiv.innerHTML =
+          '<ul class="list-group mb-4">' +
+          data
+            .map(d => {
+              const title = d.attributes && d.attributes.title ? d.attributes.title : d.filename;
+              return `<li class="list-group-item"><strong>${title}</strong><br>${d.text}</li>`;
+            })
+            .join('') +
+          '</ul>';
       }
     });
   });
