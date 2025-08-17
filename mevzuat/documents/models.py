@@ -49,7 +49,7 @@ class DocumentType(models.Model):
 
 def document_upload_to(instance, filename):
     # Upload path for the original doc and its markdown version
-    return f"docs/{instance.type.slug}/{instance.document_date.year}/{filename}"
+    return f"{instance.type.slug}/{instance.document_date.year}/{filename}"
 
 
 class Document(models.Model):
