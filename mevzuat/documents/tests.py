@@ -2,7 +2,7 @@ import json
 import shutil
 import tempfile
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import patch, PropertyMock
 
 from django.contrib import admin, messages
 from django.core.files.base import ContentFile
@@ -242,3 +242,42 @@ class DocumentAdminActionErrorTest(TestCase):
 
     def test_sync_with_vectorstore_shows_error(self):
         self._assert_error("sync_with_vectorstore", "sync_with_vectorstore")
+
+
+class DocumentSyncWithVectorStoreStorageTest(TestCase):
+    def setUp(self):
+        vs = VectorStore.objects.create(name="VS1", oai_vs_id="vs1")
+        doc_type = DocumentType.objects.create(
+            name="Kanun", fetcher="MevzuatFetcher", vector_store=vs
+        )
+        self.doc = Document.objects.create(
+            title="Doc",
+            type=doc_type,
+            document=ContentFile(b"a", name="doc.pdf"),
+            metadata={
+                "mevzuat_tur": 1,
+                "mevzuat_tertib": 1,
+                "mevzuat_no": "1",
+                "resmi_gazete_tarihi": "2020-01-01",
+            },
+        )
+
+    @patch("openai.OpenAI")
+    def test_sync_uses_storage_open(self, MockOpenAI):
+        client = MockOpenAI.return_value
+        client.files.create.return_value = SimpleNamespace(id="file-123")
+        client.vector_stores.files.create.return_value = None
+
+        # Simulate a storage backend where ``.path`` is unsupported
+        with patch.object(type(self.doc.document), "path", new_callable=PropertyMock, side_effect=NotImplementedError):
+            with patch.object(self.doc.document, "open", wraps=self.doc.document.open) as mock_open:
+                self.doc.sync_with_vectorstore()
+                mock_open.assert_called_once_with("rb")
+
+        self.assertEqual(self.doc.oai_file_id, "file-123")
+        client.files.create.assert_called_once()
+        file_arg = client.files.create.call_args.kwargs["file"]
+        self.assertIsInstance(file_arg, tuple)
+        self.assertEqual(file_arg[0], "doc.pdf")
+        self.assertEqual(file_arg[1], b"a")
+        client.vector_stores.files.create.assert_called_once()
