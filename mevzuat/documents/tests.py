@@ -1,12 +1,14 @@
-from datetime import date
 import json
 import shutil
 import tempfile
+from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.contrib import admin, messages
 from django.core.files.base import ContentFile
-from django.test import TestCase, override_settings
+from django.test import TestCase, override_settings, RequestFactory
 
+from .admin import DocumentAdmin
 from .models import Document, DocumentType, VectorStore
 
 
@@ -176,7 +178,7 @@ class DocumentSearchAPITest(TestCase):
     @patch("mevzuat.documents.api.OpenAI")
     def test_search_across_vector_stores(self, MockOpenAI):
         instance = MockOpenAI.return_value
-        instance.vector_stores.search.return_value = {"data": []}
+        instance.vector_stores.search.return_value = SimpleNamespace(data=[])
 
         response = self.client.get("/api/documents/search", {"query": "term"})
         self.assertEqual(response.status_code, 200)
@@ -185,7 +187,7 @@ class DocumentSearchAPITest(TestCase):
     @patch("mevzuat.documents.api.OpenAI")
     def test_search_with_filters(self, MockOpenAI):
         instance = MockOpenAI.return_value
-        instance.vector_stores.search.return_value = {"data": []}
+        instance.vector_stores.search.return_value = SimpleNamespace(data=[])
 
         params = {
             "query": "term",
@@ -210,3 +212,33 @@ class DocumentSearchAPITest(TestCase):
             ],
         }
         self.assertEqual(kwargs["filters"], expected_filters)
+
+
+class DocumentAdminActionErrorTest(TestCase):
+    def setUp(self):
+        self.request = RequestFactory().get("/")
+        self.admin = DocumentAdmin(Document, admin.site)
+        self.doc = Document.objects.create(
+            title="Doc", metadata={"resmi_gazete_tarihi": "2020-01-01"}
+        )
+
+    def _assert_error(self, action, method_name):
+        with patch.object(Document, method_name, side_effect=Exception("boom")):
+            with patch.object(self.admin, "message_user") as mock_msg:
+                getattr(self.admin, action)(self.request, Document.objects.all())
+                error_calls = [
+                    c
+                    for c in mock_msg.call_args_list
+                    if c.kwargs.get("level") == messages.ERROR
+                ]
+                self.assertEqual(len(error_calls), 1)
+                self.assertIn("boom", error_calls[0].args[1])
+
+    def test_fetch_original_shows_error(self):
+        self._assert_error("fetch_original", "fetch_and_store_document")
+
+    def test_convert_to_markdown_shows_error(self):
+        self._assert_error("convert_to_markdown", "convert_pdf_to_markdown")
+
+    def test_sync_with_vectorstore_shows_error(self):
+        self._assert_error("sync_with_vectorstore", "sync_with_vectorstore")

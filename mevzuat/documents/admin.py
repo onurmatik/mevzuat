@@ -105,13 +105,14 @@ class DocumentAdmin(admin.ModelAdmin):
         return bool(obj.oai_file_id)
 
     def fetch_original(self, request, queryset):
-        ok, failed = 0, 0
+        ok = 0
+        errors = []
         for obj in queryset:
             try:
                 obj.fetch_and_store_document(overwrite=True)
                 ok += 1
-            except Exception:
-                failed += 1
+            except Exception as exc:  # pragma: no cover - defensive
+                errors.append((obj, exc))
 
         if ok:
             self.message_user(
@@ -119,51 +120,53 @@ class DocumentAdmin(admin.ModelAdmin):
                 f"Successfully fetched {ok} document(s).",
                 level=messages.SUCCESS,
             )
-        if failed:
+        for obj, exc in errors:
             self.message_user(
                 request,
-                f"{failed} document(s) could not be fetched – see log.",
-                level=messages.WARNING,
+                f"{obj.title} could not be fetched: {exc}",
+                level=messages.ERROR,
             )
 
     def convert_to_markdown(self, request, queryset):
-        ok, failed = 0, 0
+        ok = 0
+        errors = []
         for obj in queryset:
             try:
                 obj.convert_pdf_to_markdown(overwrite=False)
                 ok += 1
-            except Exception:
-                failed += 1
+            except Exception as exc:  # pragma: no cover - defensive
+                errors.append((obj, exc))
         if ok:
             self.message_user(
                 request,
                 f"Successfully converted {ok} document(s).",
                 level=messages.SUCCESS,
             )
-        if failed:
+        for obj, exc in errors:
             self.message_user(
                 request,
-                f"{failed} document(s) could not be converted – see log.",
-                level=messages.WARNING,
+                f"{obj.title} could not be converted: {exc}",
+                level=messages.ERROR,
             )
 
     def sync_with_vectorstore(self, request, queryset):
-        ok, failed = 0, 0
+        ok = 0
+        errors = []
         for obj in queryset:
             try:
                 obj.sync_with_vectorstore()
                 ok += 1
-            except Exception:
-                failed += 1
+            except Exception as exc:  # pragma: no cover - defensive
+                errors.append((obj, exc))
         if ok:
             self.message_user(
                 request,
                 f"Successfully synced {ok} document(s).",
                 level=messages.SUCCESS,
             )
-        if failed:
+        for obj, exc in errors:
             self.message_user(
                 request,
-                f"{failed} document(s) could not be synced – see log.",
-                level=messages.WARNING,
+                f"{obj.title} could not be synced: {exc}",
+                level=messages.ERROR,
             )
