@@ -276,4 +276,8 @@ class DocumentSyncWithVectorStoreStorageTest(TestCase):
 
         self.assertEqual(self.doc.oai_file_id, "file-123")
         client.files.create.assert_called_once()
+        file_arg = client.files.create.call_args.kwargs["file"]
+        self.assertIsInstance(file_arg, tuple)
+        self.assertEqual(file_arg[0], "doc.pdf")
+        self.assertEqual(file_arg[1], b"a")
         client.vector_stores.files.create.assert_called_once()

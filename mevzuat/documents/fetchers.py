@@ -111,11 +111,13 @@ class BaseDocFetcher(abc.ABC):
         # remote storage backends (e.g. S3) do not provide an absolute path.
         doc.document.open("rb")
         try:
-            uploaded_file = client.files.create(
-                file=doc.document.file, purpose="user_data"
-            )
+            file_tuple = (os.path.basename(doc.document.name), doc.document.read())
         finally:
             doc.document.close()
+
+        uploaded_file = client.files.create(
+            file=file_tuple, purpose="user_data"
+        )
 
         doc.oai_file_id = uploaded_file.id
         doc.save(update_fields=["oai_file_id"])
