@@ -107,9 +107,15 @@ class BaseDocFetcher(abc.ABC):
             )
             return doc.oai_file_id
 
-        # Upload the file to OpenAI first
-        with open(doc.document.path, "rb") as f:
-            uploaded_file = client.files.create(file=f, purpose="user_data")
+        # Upload the file to OpenAI first.  Avoid using ``.path`` because
+        # remote storage backends (e.g. S3) do not provide an absolute path.
+        doc.document.open("rb")
+        try:
+            uploaded_file = client.files.create(
+                file=doc.document.file, purpose="user_data"
+            )
+        finally:
+            doc.document.close()
 
         doc.oai_file_id = uploaded_file.id
         doc.save(update_fields=["oai_file_id"])
