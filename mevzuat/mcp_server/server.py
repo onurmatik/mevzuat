@@ -11,7 +11,8 @@ from .handlers import (
     search_documents,
 )
 
-server = FastMCP("mevzuat")
+server = FastMCP("mevzuat", stateless_http=True)
+
 server.tool(list_document_types)
 server.tool(document_counts)
 server.tool(list_documents)
