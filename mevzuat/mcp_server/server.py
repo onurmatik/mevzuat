@@ -23,4 +23,4 @@ def run() -> None:
     server.run()
 
 
-app = server.http_app()
+app = server.http_app(path="/")
