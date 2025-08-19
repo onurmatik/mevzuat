@@ -23,4 +23,4 @@ def run() -> None:
     server.run()
 
 
-__all__ = ["server", "run"]
+app = server.http_app()
