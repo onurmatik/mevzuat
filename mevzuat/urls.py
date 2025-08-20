@@ -16,6 +16,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path("api/", api.urls),
     path("", documents_views.main, name="home"),
+    path("search/", documents_views.search, name="search"),
 ]
 
 
