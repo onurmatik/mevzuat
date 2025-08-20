@@ -41,13 +41,17 @@
     <div id="searchResults"></div>
   </div>
   <div class="col-md-3">
-    <div class="border rounded p-3 mb-4">
-      <h5>Sort by</h5>
-      <select id="sortSelect" class="form-select">
-        <option value="relevance">Relevance</option>
-        <option value="date_desc">Date (Newest)</option>
-        <option value="date_asc">Date (Oldest)</option>
-      </select>
+    <div class="border rounded p-3 mb-4 d-none" id="infoBox">
+      <div class="mb-3">
+        <h5>Sort by</h5>
+        <select id="sortSelect" class="form-select">
+          <option value="relevance">Relevance</option>
+          <option value="date_desc">Date (Newest)</option>
+          <option value="date_asc">Date (Oldest)</option>
+        </select>
+      </div>
+      <div id="typeCounts" class="mb-3"></div>
+      <div id="dateCounts"></div>
     </div>
   </div>
 </div>
@@ -65,6 +69,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const searchInput = document.getElementById('searchInput');
   const resultsDiv = document.getElementById('searchResults');
   const sortSelect = document.getElementById('sortSelect');
+  const infoBox = document.getElementById('infoBox');
+  const typeCountsDiv = document.getElementById('typeCounts');
+  const dateCountsDiv = document.getElementById('dateCounts');
   const typeMap = {};
   const slugToLabel = {};
   let allResults = [];
@@ -121,10 +128,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function updateInfoBox() {
+    if (!allResults.length) {
+      infoBox.classList.add('d-none');
+      typeCountsDiv.innerHTML = '';
+      dateCountsDiv.innerHTML = '';
+      return;
+    }
+    infoBox.classList.remove('d-none');
+
+    const typeCounts = {};
+    allResults.forEach(d => {
+      const slug = d.attributes?.type;
+      if (slug) typeCounts[slug] = (typeCounts[slug] || 0) + 1;
+    });
+    typeCountsDiv.innerHTML = '<h6>Document Types</h6><ul class="list-unstyled mb-0">' +
+      Object.entries(typeCounts).map(([slug, count]) => `<li>${slugToLabel[slug] || slug}: ${count}</li>`).join('') +
+      '</ul>';
+
+    const dateCounts = {};
+    allResults.forEach(d => {
+      const date = d.attributes?.date;
+      if (date && date.length >= 7) {
+        const ym = date.slice(0, 7);
+        dateCounts[ym] = (dateCounts[ym] || 0) + 1;
+      }
+    });
+    const dateItems = Object.entries(dateCounts)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([ym, count]) => `<li>${ym}: ${count}</li>`)
+      .join('');
+    dateCountsDiv.innerHTML = '<h6>Year & Month</h6><ul class="list-unstyled mb-0">' + dateItems + '</ul>';
+  }
+
   function renderResults() {
     if (!allResults.length) {
       resultsDiv.innerHTML = '<div class="alert alert-warning">No results</div>';
       observer.disconnect();
+      updateInfoBox();
       return;
     }
     const items = allResults.map(d => {
@@ -148,6 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       sentinel.remove();
     }
+    updateInfoBox();
   }
 
   const PAGE_SIZE = 10;
@@ -217,6 +259,9 @@ document.addEventListener('DOMContentLoaded', () => {
     currentOffset = 0;
     hasMore = false;
     allResults = [];
+    infoBox.classList.add('d-none');
+    typeCountsDiv.innerHTML = '';
+    dateCountsDiv.innerHTML = '';
     await fetchResults(false);
   }
 
