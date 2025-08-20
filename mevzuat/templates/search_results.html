@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}Search Results{% endblock %}
+
+{% block extra_css %}
+<style>
+  .legend-item { display: flex; align-items: center; margin-bottom: .25rem; }
+  .legend-color { width: 12px; height: 12px; display: inline-block; margin-right: .5rem; border-radius: 2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav class="navbar navbar-expand-lg bg-body-tertiary rounded mb-4">
+  <div class="container-fluid">
+    <div class="dropdown me-2">
+      <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        Types
+      </button>
+      <ul class="dropdown-menu" id="typeFilter"></ul>
+    </div>
+
+    <select class="form-select me-2" style="max-width:150px;" id="rangeSelect">
+      <option value="all">All</option>
+      <option value="thisYear">This Year</option>
+      <option value="lastYear">Last Year</option>
+      <option value="30days">30 Days</option>
+      <option value="custom">Custom</option>
+    </select>
+
+    <input type="date" class="form-control me-2 d-none" id="startDate">
+    <input type="date" class="form-control me-2 d-none" id="endDate">
+
+    <form class="d-flex ms-auto" id="searchForm">
+      <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search" id="searchInput">
+      <button class="btn btn-outline-success" type="submit">Search</button>
+    </form>
+  </div>
+</nav>
+
+<div id="searchResults" class="mb-4"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const palette = ['#0d6efd','#6c757d','#198754','#dc3545','#ffc107','#0dcaf0','#6610f2','#d63384','#20c997','#fd7e14'];
+  const typeFilter = document.getElementById('typeFilter');
+  const rangeSelect = document.getElementById('rangeSelect');
+  const startDateInput = document.getElementById('startDate');
+  const endDateInput = document.getElementById('endDate');
+  const searchForm = document.getElementById('searchForm');
+  const searchInput = document.getElementById('searchInput');
+  const resultsDiv = document.getElementById('searchResults');
+  const typeMap = {};
+
+  function slugify(str) {
+    return str
+      .toString()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  function getRange() {
+    const opt = rangeSelect.value;
+    const today = new Date();
+    let start = '', end = '';
+    if (opt === 'thisYear') {
+      start = `${today.getFullYear()}-01-01`;
+      end = today.toISOString().split('T')[0];
+    } else if (opt === 'lastYear') {
+      const year = today.getFullYear() - 1;
+      start = `${year}-01-01`;
+      end = `${year}-12-31`;
+    } else if (opt === '30days') {
+      const past = new Date();
+      past.setDate(today.getDate() - 30);
+      start = past.toISOString().split('T')[0];
+      end = today.toISOString().split('T')[0];
+    } else if (opt === 'custom') {
+      start = startDateInput.value;
+      end = endDateInput.value;
+    }
+    return { start, end };
+  }
+
+  async function performSearch() {
+    resultsDiv.innerHTML = '<div class="text-center my-4"><div class="spinner-border" role="status"></div></div>';
+    const q = searchInput.value.trim();
+    if (!q) { resultsDiv.innerHTML = ''; return; }
+
+    const selectedSlugs = Object.keys(typeMap)
+      .filter(label => typeMap[label].visible)
+      .map(label => typeMap[label].slug);
+
+    const params = new URLSearchParams({ query: q });
+    const { start, end } = getRange();
+    if (start) params.set('start_date', start);
+    if (end) params.set('end_date', end);
+    if (selectedSlugs.length === 1) {
+      params.set('type', selectedSlugs[0]);
+    }
+
+    try {
+      const res = await fetch('/api/documents/search?' + params.toString());
+      if (!res.ok) {
+        resultsDiv.innerHTML = '<div class="alert alert-danger">Search failed</div>';
+        return;
+      }
+      let { data } = await res.json();
+      if (selectedSlugs.length > 1) {
+        data = data.filter(d => selectedSlugs.includes(d.attributes?.type));
+      }
+      if (!Array.isArray(data) || !data.length) {
+        resultsDiv.innerHTML = '<div class="alert alert-warning">No results</div>';
+      } else {
+        resultsDiv.innerHTML =
+          '<ul class="list-group mb-4">' +
+          data.map(d => {
+            const title = d.attributes && d.attributes.title ? d.attributes.title : d.filename;
+            return `<li class="list-group-item"><strong>${title}</strong><br>${d.text}</li>`;
+          }).join('') +
+          '</ul>';
+      }
+    } catch (err) {
+      console.error(err);
+      resultsDiv.innerHTML = '<div class="alert alert-danger">Search failed</div>';
+    }
+  }
+
+  searchForm.addEventListener('submit', e => {
+    e.preventDefault();
+    performSearch();
+  });
+
+  rangeSelect.addEventListener('change', () => {
+    const custom = rangeSelect.value === 'custom';
+    startDateInput.classList.toggle('d-none', !custom);
+    endDateInput.classList.toggle('d-none', !custom);
+    if (searchInput.value.trim()) {
+      performSearch();
+    }
+  });
+  startDateInput.addEventListener('change', () => {
+    if (searchInput.value.trim()) performSearch();
+  });
+  endDateInput.addEventListener('change', () => {
+    if (searchInput.value.trim()) performSearch();
+  });
+
+  async function loadTypes() {
+    try {
+      const res = await fetch('/api/documents/types');
+      const types = await res.json();
+      types.forEach((t, idx) => {
+        const slug = slugify(t.label);
+        typeMap[t.label] = { id: t.id, slug, color: palette[idx % palette.length], visible: true };
+        const li = document.createElement('li');
+        li.innerHTML = `<label class="dropdown-item"><input type="checkbox" class="form-check-input me-2" data-label="${t.label}" checked> ${t.label}</label>`;
+        typeFilter.appendChild(li);
+      });
+      document.querySelectorAll('#typeFilter input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          const label = cb.getAttribute('data-label');
+          typeMap[label].visible = cb.checked;
+          if (searchInput.value.trim()) {
+            performSearch();
+          }
+        });
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const initialQuery = params.get('query');
+  const initialType = params.get('type');
+  const initialStart = params.get('start_date');
+  const initialEnd = params.get('end_date');
+
+  loadTypes().then(() => {
+    if (initialType) {
+      document.querySelectorAll('#typeFilter input[type="checkbox"]').forEach(cb => {
+        const label = cb.getAttribute('data-label');
+        const slug = typeMap[label].slug;
+        const checked = slug === initialType;
+        cb.checked = checked;
+        typeMap[label].visible = checked;
+      });
+    }
+    if (initialStart || initialEnd) {
+      rangeSelect.value = 'custom';
+      startDateInput.classList.remove('d-none');
+      endDateInput.classList.remove('d-none');
+      if (initialStart) startDateInput.value = initialStart;
+      if (initialEnd) endDateInput.value = initialEnd;
+    }
+    if (initialQuery) {
+      searchInput.value = initialQuery;
+      performSearch();
+    }
+  });
+});
+</script>
+{% endblock %}
