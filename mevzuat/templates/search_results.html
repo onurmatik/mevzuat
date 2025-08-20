@@ -36,8 +36,21 @@
     </form>
   </div>
 </nav>
-
-<div id="searchResults" class="mb-4"></div>
+<div class="row">
+  <div class="col-md-9 mb-4" id="leftColumn">
+    <div id="searchResults"></div>
+  </div>
+  <div class="col-md-3">
+    <div class="border rounded p-3 mb-4">
+      <h5>Sort by</h5>
+      <select id="sortSelect" class="form-select">
+        <option value="relevance">Relevance</option>
+        <option value="date_desc">Date (Newest)</option>
+        <option value="date_asc">Date (Oldest)</option>
+      </select>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -51,8 +64,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const searchForm = document.getElementById('searchForm');
   const searchInput = document.getElementById('searchInput');
   const resultsDiv = document.getElementById('searchResults');
+  const sortSelect = document.getElementById('sortSelect');
   const typeMap = {};
   const slugToLabel = {};
+  let allResults = [];
 
   function slugify(str) {
     return str
@@ -85,6 +100,54 @@ document.addEventListener('DOMContentLoaded', () => {
       end = endDateInput.value;
     }
     return { start, end };
+  }
+
+  function sortResults() {
+    const sort = sortSelect.value;
+    if (sort === 'date_desc') {
+      allResults.sort((a, b) => {
+        const da = a.attributes?.date || '';
+        const db = b.attributes?.date || '';
+        return db.localeCompare(da);
+      });
+    } else if (sort === 'date_asc') {
+      allResults.sort((a, b) => {
+        const da = a.attributes?.date || '';
+        const db = b.attributes?.date || '';
+        return da.localeCompare(db);
+      });
+    } else {
+      allResults.sort((a, b) => (b.score || 0) - (a.score || 0));
+    }
+  }
+
+  function renderResults() {
+    if (!allResults.length) {
+      resultsDiv.innerHTML = '<div class="alert alert-warning">No results</div>';
+      observer.disconnect();
+      return;
+    }
+    const items = allResults.map(d => {
+      const title = d.attributes && d.attributes.title ? d.attributes.title : d.filename;
+      const date = d.attributes?.date || '';
+      const typeSlug = d.attributes?.type || '';
+      const typeLabel = slugToLabel[typeSlug] || typeSlug;
+      const score = typeof d.score === 'number' ? d.score.toFixed(2) : '';
+      const metaParts = [];
+      if (date) metaParts.push(date);
+      if (typeLabel) metaParts.push(typeLabel);
+      if (score) metaParts.push(`Relevance: ${score}`);
+      const meta = metaParts.join(' | ');
+      return `<li class="list-group-item"><strong>${title}</strong><br><small class="text-muted">${meta}</small><br>${d.text}</li>`;
+    }).join('');
+    resultsDiv.innerHTML = `<ul id="resultsList" class="list-group mb-4">${items}</ul><div id="scrollSentinel"></div>`;
+    const sentinel = document.getElementById('scrollSentinel');
+    observer.disconnect();
+    if (hasMore) {
+      observer.observe(sentinel);
+    } else {
+      sentinel.remove();
+    }
   }
 
   const PAGE_SIZE = 10;
@@ -131,35 +194,14 @@ document.addEventListener('DOMContentLoaded', () => {
         data = data.filter(d => selectedSlugs.includes(d.attributes?.type));
       }
       if (!append) {
-        if (!Array.isArray(data) || !data.length) {
-          resultsDiv.innerHTML = '<div class="alert alert-warning">No results</div>';
-          hasMore = false;
-          loading = false;
-          return;
-        }
-        resultsDiv.innerHTML = '<ul id="resultsList" class="list-group mb-4"></ul><div id="scrollSentinel"></div>';
+        allResults = data;
+      } else {
+        allResults = allResults.concat(data);
       }
-      const list = document.getElementById('resultsList');
-      list.insertAdjacentHTML('beforeend', data.map(d => {
-        const title = d.attributes && d.attributes.title ? d.attributes.title : d.filename;
-        const date = d.attributes?.date || '';
-        const typeSlug = d.attributes?.type || '';
-        const typeLabel = slugToLabel[typeSlug] || typeSlug;
-        const score = typeof d.score === 'number' ? d.score.toFixed(2) : '';
-        const metaParts = [];
-        if (date) metaParts.push(date);
-        if (typeLabel) metaParts.push(typeLabel);
-        if (score) metaParts.push(`Relevance: ${score}`);
-        const meta = metaParts.join(' | ');
-        return `<li class="list-group-item"><strong>${title}</strong><br><small class="text-muted">${meta}</small><br>${d.text}</li>`;
-      }).join(''));
       currentOffset += data.length;
       hasMore = has_more;
-      if (!hasMore) {
-        observer.disconnect();
-        const sentinel = document.getElementById('scrollSentinel');
-        if (sentinel) sentinel.remove();
-      }
+      sortResults();
+      renderResults();
     } catch (err) {
       console.error(err);
       if (!append) {
@@ -167,8 +209,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } finally {
       loading = false;
-      const sentinel = document.getElementById('scrollSentinel');
-      if (sentinel) sentinel.innerHTML = '';
     }
   }
 
@@ -176,11 +216,8 @@ document.addEventListener('DOMContentLoaded', () => {
     observer.disconnect();
     currentOffset = 0;
     hasMore = false;
+    allResults = [];
     await fetchResults(false);
-    if (hasMore) {
-      const sentinel = document.getElementById('scrollSentinel');
-      if (sentinel) observer.observe(sentinel);
-    }
   }
 
   searchForm.addEventListener('submit', e => {
@@ -201,6 +238,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   endDateInput.addEventListener('change', () => {
     if (searchInput.value.trim()) performSearch();
+  });
+  sortSelect.addEventListener('change', () => {
+    sortResults();
+    renderResults();
   });
 
   async function loadTypes() {
