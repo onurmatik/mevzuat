@@ -207,8 +207,14 @@
 
     searchForm.addEventListener('submit', async e => {
       e.preventDefault();
+      // Clear any previous search results or messages
+      resultsDiv.innerHTML = '';
       const q = searchInput.value.trim();
       if (!q) return;
+
+      // Show loading spinner while searching
+      resultsDiv.innerHTML = '<div class="text-center my-4"><div class="spinner-border" role="status"></div></div>';
+
       const selectedSlugs = Object.keys(typeMap)
         .filter(label => typeMap[label].visible)
         .map(label => typeMap[label].slug);
@@ -219,24 +225,33 @@
       if (selectedSlugs.length === 1) {
         params.set('type', selectedSlugs[0]);
       }
-      const res = await fetch('/api/documents/search?' + params.toString());
-      if (!res.ok) return;
-      let { data } = await res.json();
-      if (selectedSlugs.length > 1) {
-        data = data.filter(d => selectedSlugs.includes(d.attributes?.type));
-      }
-      if (!Array.isArray(data) || !data.length) {
-        resultsDiv.innerHTML = '<div class="alert alert-warning">No results</div>';
-      } else {
-        resultsDiv.innerHTML =
-          '<ul class="list-group mb-4">' +
-          data
-            .map(d => {
-              const title = d.attributes && d.attributes.title ? d.attributes.title : d.filename;
-              return `<li class="list-group-item"><strong>${title}</strong><br>${d.text}</li>`;
-            })
-            .join('') +
-          '</ul>';
+
+      try {
+        const res = await fetch('/api/documents/search?' + params.toString());
+        if (!res.ok) {
+          resultsDiv.innerHTML = '<div class="alert alert-danger">Search failed</div>';
+          return;
+        }
+        let { data } = await res.json();
+        if (selectedSlugs.length > 1) {
+          data = data.filter(d => selectedSlugs.includes(d.attributes?.type));
+        }
+        if (!Array.isArray(data) || !data.length) {
+          resultsDiv.innerHTML = '<div class="alert alert-warning">No results</div>';
+        } else {
+          resultsDiv.innerHTML =
+            '<ul class="list-group mb-4">' +
+            data
+              .map(d => {
+                const title = d.attributes && d.attributes.title ? d.attributes.title : d.filename;
+                return `<li class="list-group-item"><strong>${title}</strong><br>${d.text}</li>`;
+              })
+              .join('') +
+            '</ul>';
+        }
+      } catch (err) {
+        console.error(err);
+        resultsDiv.innerHTML = '<div class="alert alert-danger">Search failed</div>';
       }
     });
   });
