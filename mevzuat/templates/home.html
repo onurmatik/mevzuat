@@ -10,32 +10,26 @@
 {% endblock %}
 
 {% block content %}
-<nav class="navbar navbar-expand-lg bg-body-tertiary rounded mb-4">
-  <div class="container-fluid">
-    <div class="dropdown me-2">
-      <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-        Types
-      </button>
-      <ul class="dropdown-menu" id="typeFilter"></ul>
-    </div>
-
-    <select class="form-select me-2" style="max-width:150px;" id="rangeSelect">
-      <option value="all">All</option>
-      <option value="thisYear">This Year</option>
-      <option value="lastYear">Last Year</option>
-      <option value="30days">30 Days</option>
-      <option value="custom">Custom</option>
-    </select>
-
-    <input type="date" class="form-control me-2 d-none" id="startDate">
-    <input type="date" class="form-control me-2 d-none" id="endDate">
-
-    <form class="d-flex ms-auto" id="searchForm">
-      <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search" id="searchInput">
-      <button class="btn btn-outline-success" type="submit">Search</button>
-    </form>
+<div class="bg-body-tertiary rounded p-3 mb-4">
+  <div class="mb-3">
+    <div id="typeFilter" class="btn-group" role="group"></div>
   </div>
-</nav>
+  <div class="mb-3">
+    <div id="rangeButtons" class="btn-group me-2" role="group">
+      <button type="button" class="btn btn-outline-secondary active" data-range="all">All</button>
+      <button type="button" class="btn btn-outline-secondary" data-range="thisYear">This Year</button>
+      <button type="button" class="btn btn-outline-secondary" data-range="lastYear">Last Year</button>
+      <button type="button" class="btn btn-outline-secondary" data-range="30days">30 Days</button>
+      <button type="button" class="btn btn-outline-secondary" data-range="custom">Custom</button>
+    </div>
+    <input type="date" class="form-control d-inline-block me-2 d-none" id="startDate">
+    <input type="date" class="form-control d-inline-block d-none" id="endDate">
+  </div>
+  <form class="d-flex" id="searchForm">
+    <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search" id="searchInput">
+    <button class="btn btn-outline-success" type="submit">Search</button>
+  </form>
+</div>
 
 <div class="row">
   <div class="col-lg-8">
@@ -53,7 +47,8 @@
   document.addEventListener('DOMContentLoaded', () => {
     const palette = ['#0d6efd','#6c757d','#198754','#dc3545','#ffc107','#0dcaf0','#6610f2','#d63384','#20c997','#fd7e14'];
     const typeFilter = document.getElementById('typeFilter');
-    const rangeSelect = document.getElementById('rangeSelect');
+    const rangeButtons = document.getElementById('rangeButtons');
+    let currentRange = 'all';
     const startDateInput = document.getElementById('startDate');
     const endDateInput = document.getElementById('endDate');
     const legend = document.getElementById('chartLegend');
@@ -81,14 +76,16 @@
         types.forEach((t, idx) => {
           const slug = slugify(t.label);
           typeMap[t.label] = { id: t.id, slug, color: palette[idx % palette.length], visible: true };
-          const li = document.createElement('li');
-          li.innerHTML = `<label class="dropdown-item"><input type="checkbox" class="form-check-input me-2" data-label="${t.label}" checked> ${t.label}</label>`;
-          typeFilter.appendChild(li);
-        });
-        document.querySelectorAll('#typeFilter input[type="checkbox"]').forEach(cb => {
-          cb.addEventListener('change', () => {
-            const label = cb.getAttribute('data-label');
-            typeMap[label].visible = cb.checked;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn btn-outline-secondary active';
+          btn.textContent = t.label;
+          btn.setAttribute('data-label', t.label);
+          typeFilter.appendChild(btn);
+          btn.addEventListener('click', () => {
+            btn.classList.toggle('active');
+            const label = btn.getAttribute('data-label');
+            typeMap[label].visible = btn.classList.contains('active');
             updateChart();
           });
         });
@@ -99,7 +96,7 @@
     }
 
     function getRange() {
-      const opt = rangeSelect.value;
+      const opt = currentRange;
       const today = new Date();
       let start = '', end = '', interval = 'year';
       if (opt === 'thisYear') {
@@ -193,11 +190,16 @@
       legend.innerHTML = html;
     }
 
-    rangeSelect.addEventListener('change', () => {
-      const custom = rangeSelect.value === 'custom';
-      startDateInput.classList.toggle('d-none', !custom);
-      endDateInput.classList.toggle('d-none', !custom);
-      updateChart();
+    rangeButtons.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        rangeButtons.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentRange = btn.getAttribute('data-range');
+        const custom = currentRange === 'custom';
+        startDateInput.classList.toggle('d-none', !custom);
+        endDateInput.classList.toggle('d-none', !custom);
+        updateChart();
+      });
     });
     startDateInput.addEventListener('change', () => updateChart());
     endDateInput.addEventListener('change', () => updateChart());
