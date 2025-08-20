@@ -27,6 +27,11 @@
       <option value="custom">Custom</option>
     </select>
 
+    <select class="form-select me-2" style="max-width:150px;" id="sortSelect">
+      <option value="relevance">Relevance</option>
+      <option value="date_desc">Newest First</option>
+    </select>
+
     <input type="date" class="form-control me-2 d-none" id="startDate">
     <input type="date" class="form-control me-2 d-none" id="endDate">
 
@@ -46,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const palette = ['#0d6efd','#6c757d','#198754','#dc3545','#ffc107','#0dcaf0','#6610f2','#d63384','#20c997','#fd7e14'];
   const typeFilter = document.getElementById('typeFilter');
   const rangeSelect = document.getElementById('rangeSelect');
+  const sortSelect = document.getElementById('sortSelect');
   const startDateInput = document.getElementById('startDate');
   const endDateInput = document.getElementById('endDate');
   const searchForm = document.getElementById('searchForm');
@@ -108,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .filter(label => typeMap[label].visible)
       .map(label => typeMap[label].slug);
 
-    const params = new URLSearchParams({ query: q, limit: PAGE_SIZE, offset: currentOffset });
+    const params = new URLSearchParams({ query: q, limit: PAGE_SIZE, offset: currentOffset, sort: sortSelect.value });
     const { start, end } = getRange();
     if (start) params.set('start_date', start);
     if (end) params.set('end_date', end);
@@ -196,6 +202,11 @@ document.addEventListener('DOMContentLoaded', () => {
       performSearch();
     }
   });
+  sortSelect.addEventListener('change', () => {
+    if (searchInput.value.trim()) {
+      performSearch();
+    }
+  });
   startDateInput.addEventListener('change', () => {
     if (searchInput.value.trim()) performSearch();
   });
@@ -234,6 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const initialType = params.get('type');
   const initialStart = params.get('start_date');
   const initialEnd = params.get('end_date');
+  const initialSort = params.get('sort') || 'relevance';
 
   loadTypes().then(() => {
     if (initialType) {
@@ -252,6 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (initialStart) startDateInput.value = initialStart;
       if (initialEnd) endDateInput.value = initialEnd;
     }
+    sortSelect.value = initialSort;
     if (initialQuery) {
       searchInput.value = initialQuery;
       performSearch();

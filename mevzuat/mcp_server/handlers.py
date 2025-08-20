@@ -118,6 +118,7 @@ def search_documents(
     score_threshold: float | None = None,
     limit: int = 10,
     offset: int = 0,
+    sort: str = "relevance",
 ) -> dict[str, Any]:
     """Search documents across all vector stores."""
     if type:
@@ -188,7 +189,13 @@ def search_documents(
                     }
                 )
 
-    results.sort(key=lambda r: r.get("score", 0), reverse=True)
+    if sort == "date_desc":
+        results.sort(
+            key=lambda r: r.get("attributes", {}).get("date") or "",
+            reverse=True,
+        )
+    else:
+        results.sort(key=lambda r: r.get("score", 0), reverse=True)
     page = results[offset:offset + limit]
     has_more = len(results) > offset + limit
     return {"data": page, "has_more": has_more}

@@ -241,6 +241,32 @@ class DocumentSearchAPITest(TestCase):
         self.assertEqual(calls[0].kwargs["max_num_results"], 3)
         self.assertEqual(calls[1].kwargs["max_num_results"], 5)
 
+    @patch("mevzuat.documents.api.OpenAI")
+    def test_search_sort_by_date_desc(self, MockOpenAI):
+        instance = MockOpenAI.return_value
+        newer = SimpleNamespace(
+            content=[SimpleNamespace(text="new", type="text")],
+            filename="n",
+            score=0.5,
+            attributes={"type": "kanun", "date": "2021-01-02"},
+        )
+        older = SimpleNamespace(
+            content=[SimpleNamespace(text="old", type="text")],
+            filename="o",
+            score=0.9,
+            attributes={"type": "kanun", "date": "2020-12-31"},
+        )
+        instance.vector_stores.search.return_value = SimpleNamespace(data=[older, newer])
+
+        response = self.client.get(
+            "/api/documents/search",
+            {"query": "term", "type": "kanun", "sort": "date_desc"},
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data[0]["attributes"]["date"], "2021-01-02")
+        self.assertEqual(data[1]["attributes"]["date"], "2020-12-31")
+
 
 class DocumentAdminActionErrorTest(TestCase):
     def setUp(self):

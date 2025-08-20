@@ -66,6 +66,7 @@ def search_documents(
     score_threshold: Optional[float] = Query(None),
     limit: int = Query(10),
     offset: int = Query(0),
+    sort: str = Query("relevance", description="Sort order ('relevance' or 'date_desc')"),
 ):
     """Search documents across all vector stores.
 
@@ -144,7 +145,13 @@ def search_documents(
                     "attributes": item.attributes,
                 })
 
-    results.sort(key=lambda r: r.get("score", 0), reverse=True)
+    if sort == "date_desc":
+        results.sort(
+            key=lambda r: r.get("attributes", {}).get("date") or "",
+            reverse=True,
+        )
+    else:
+        results.sort(key=lambda r: r.get("score", 0), reverse=True)
     page = results[offset:offset + limit]
     has_more = len(results) > offset + limit
     return {"data": page, "has_more": has_more}
