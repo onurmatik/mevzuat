@@ -65,6 +65,7 @@ def search_documents(
     end_date: Optional[date] = Query(None),
     score_threshold: Optional[float] = Query(None),
     limit: int = Query(10),
+    offset: int = Query(0),
 ):
     """Search documents across all vector stores.
 
@@ -120,11 +121,12 @@ def search_documents(
         ranking_options["score_threshold"] = score_threshold
 
     results: list[dict[str, Any]] = []
+    fetch_count = offset + limit + 1
     for vs_id in vector_store_ids:
         search_kwargs = {
             "vector_store_id": vs_id,
             "query": query,
-            "max_num_results": limit,
+            "max_num_results": fetch_count,
             "ranking_options": ranking_options or None,
             "rewrite_query": True,
         }
@@ -139,11 +141,13 @@ def search_documents(
                     "type": c.type,
                     "filename": item.filename,
                     "score": item.score,
-                    "attributes": item.attributes
+                    "attributes": item.attributes,
                 })
 
     results.sort(key=lambda r: r.get("score", 0), reverse=True)
-    return {"data": results[:limit]}
+    page = results[offset:offset + limit]
+    has_more = len(results) > offset + limit
+    return {"data": page, "has_more": has_more}
 
 
 @router.post("/vector-stores/{vs_uuid}/search")

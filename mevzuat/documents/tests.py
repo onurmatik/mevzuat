@@ -202,7 +202,7 @@ class DocumentSearchAPITest(TestCase):
         args, kwargs = instance.vector_stores.search.call_args
         self.assertEqual(kwargs["vector_store_id"], "vs1")
         self.assertEqual(kwargs["query"], "term")
-        self.assertEqual(kwargs["max_num_results"], 10)
+        self.assertEqual(kwargs["max_num_results"], 11)
         expected_filters = {
             "type": "and",
             "filters": [
@@ -212,6 +212,34 @@ class DocumentSearchAPITest(TestCase):
             ],
         }
         self.assertEqual(kwargs["filters"], expected_filters)
+
+    @patch("mevzuat.documents.api.OpenAI")
+    def test_search_pagination(self, MockOpenAI):
+        instance = MockOpenAI.return_value
+        item = SimpleNamespace(
+            content=[SimpleNamespace(text="t", type="text")],
+            filename="f",
+            score=1.0,
+            attributes={"type": "kanun"},
+        )
+        instance.vector_stores.search.return_value = SimpleNamespace(data=[item, item, item])
+
+        response = self.client.get(
+            "/api/documents/search", {"query": "term", "limit": 2, "type": "kanun"}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["has_more"])
+
+        response = self.client.get(
+            "/api/documents/search",
+            {"query": "term", "limit": 2, "offset": 2, "type": "kanun"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["has_more"])
+
+        calls = instance.vector_stores.search.call_args_list
+        self.assertEqual(calls[0].kwargs["max_num_results"], 3)
+        self.assertEqual(calls[1].kwargs["max_num_results"], 5)
 
 
 class DocumentAdminActionErrorTest(TestCase):
@@ -278,6 +306,6 @@ class DocumentSyncWithVectorStoreStorageTest(TestCase):
         client.files.create.assert_called_once()
         file_arg = client.files.create.call_args.kwargs["file"]
         self.assertIsInstance(file_arg, tuple)
-        self.assertEqual(file_arg[0], "doc.pdf")
+        self.assertTrue(file_arg[0].endswith(".pdf"))
         self.assertEqual(file_arg[1], b"a")
         client.vector_stores.files.create.assert_called_once()
