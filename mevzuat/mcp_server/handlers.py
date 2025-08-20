@@ -117,6 +117,7 @@ def search_documents(
     end_date: date | None = None,
     score_threshold: float | None = None,
     limit: int = 10,
+    offset: int = 0,
 ) -> dict[str, Any]:
     """Search documents across all vector stores."""
     if type:
@@ -162,11 +163,12 @@ def search_documents(
         ranking_options["score_threshold"] = score_threshold
 
     results: list[dict[str, Any]] = []
+    fetch_count = offset + limit + 1
     for vs_id in vector_store_ids:
         search_kwargs = {
             "vector_store_id": vs_id,
             "query": query,
-            "max_num_results": limit,
+            "max_num_results": fetch_count,
             "ranking_options": ranking_options or None,
             "rewrite_query": True,
         }
@@ -187,7 +189,9 @@ def search_documents(
                 )
 
     results.sort(key=lambda r: r.get("score", 0), reverse=True)
-    return {"data": results[:limit]}
+    page = results[offset:offset + limit]
+    has_more = len(results) > offset + limit
+    return {"data": page, "has_more": has_more}
 
 
 __all__ = [
