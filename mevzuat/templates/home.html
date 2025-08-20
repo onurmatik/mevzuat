@@ -15,13 +15,13 @@
   <div class="col-lg-8">
     <canvas id="documentsChart" height="150"></canvas>
   </div>
-  <div class="col-lg-4">
+  <div class="col-lg-4 d-flex flex-column h-100">
     <div id="chartLegend" class="small mb-3"></div>
-    <div id="rangeButtons" class="btn-group" role="group">
-      <button type="button" class="btn btn-outline-secondary active" data-range="30days">30 Days</button>
-      <button type="button" class="btn btn-outline-secondary" data-range="thisYear">This Year</button>
-      <button type="button" class="btn btn-outline-secondary" data-range="lastYear">Last Year</button>
-      <button type="button" class="btn btn-outline-secondary" data-range="all">All</button>
+    <div id="rangeButtons" class="btn-group w-100" role="group">
+      <button type="button" class="btn btn-outline-secondary flex-fill active" data-range="30days">30 Days</button>
+      <button type="button" class="btn btn-outline-secondary flex-fill" data-range="thisYear">This Year</button>
+      <button type="button" class="btn btn-outline-secondary flex-fill" data-range="lastYear">Last Year</button>
+      <button type="button" class="btn btn-outline-secondary flex-fill" data-range="all">All</button>
     </div>
   </div>
 </div>
@@ -53,6 +53,16 @@
       <li><code>search</code> — Search documents with optional filters like type and date range.</li>
     </ul>
     <p>Refer to the <a href="/api/docs">API documentation</a> for detailed parameter descriptions, which also apply when using these tools via MCP.</p>
+  </div>
+</div>
+
+<hr class="my-5">
+<div class="row">
+  <div class="col-12">
+    <h2 class="fs-4">Source code</h2>
+    <p>This is an <strong>open source</strong> project. Although its primary focus is on Turkish legislation, it is built as a flexible Django project that can be adapted to similar document intelligence needs in other contexts.</p>
+    <p>We invite you to use it, experiment with it, and contribute improvements. If you’d like to help improve this project, you can find the source code and contribute via our GitHub repository:</p>
+    <p><a href="https://github.com/onurmatik/mevzuat/" target="_blank">https://github.com/onurmatik/mevzuat/</a></p>
   </div>
 </div>
 
@@ -144,6 +154,7 @@
           data: { labels: periods, datasets },
           options: {
             responsive: true,
+            plugins: { legend: { display: false } },
             scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
           }
         });
