@@ -52,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const searchInput = document.getElementById('searchInput');
   const resultsDiv = document.getElementById('searchResults');
   const typeMap = {};
+  const slugToLabel = {};
 
   function slugify(str) {
     return str
@@ -120,7 +121,16 @@ document.addEventListener('DOMContentLoaded', () => {
           '<ul class="list-group mb-4">' +
           data.map(d => {
             const title = d.attributes && d.attributes.title ? d.attributes.title : d.filename;
-            return `<li class="list-group-item"><strong>${title}</strong><br>${d.text}</li>`;
+            const date = d.attributes?.date || '';
+            const typeSlug = d.attributes?.type || '';
+            const typeLabel = slugToLabel[typeSlug] || typeSlug;
+            const score = typeof d.score === 'number' ? d.score.toFixed(2) : '';
+            const metaParts = [];
+            if (date) metaParts.push(date);
+            if (typeLabel) metaParts.push(typeLabel);
+            if (score) metaParts.push(`Relevance: ${score}`);
+            const meta = metaParts.join(' | ');
+            return `<li class="list-group-item"><strong>${title}</strong><br><small class="text-muted">${meta}</small><br>${d.text}</li>`;
           }).join('') +
           '</ul>';
       }
@@ -152,15 +162,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function loadTypes() {
     try {
-      const res = await fetch('/api/documents/types');
-      const types = await res.json();
-      types.forEach((t, idx) => {
-        const slug = slugify(t.label);
-        typeMap[t.label] = { id: t.id, slug, color: palette[idx % palette.length], visible: true };
-        const li = document.createElement('li');
-        li.innerHTML = `<label class="dropdown-item"><input type="checkbox" class="form-check-input me-2" data-label="${t.label}" checked> ${t.label}</label>`;
-        typeFilter.appendChild(li);
-      });
+        const res = await fetch('/api/documents/types');
+        const types = await res.json();
+        types.forEach((t, idx) => {
+          const slug = slugify(t.label);
+          typeMap[t.label] = { id: t.id, slug, color: palette[idx % palette.length], visible: true };
+          slugToLabel[slug] = t.label;
+          const li = document.createElement('li');
+          li.innerHTML = `<label class="dropdown-item"><input type="checkbox" class="form-check-input me-2" data-label="${t.label}" checked> ${t.label}</label>`;
+          typeFilter.appendChild(li);
+        });
       document.querySelectorAll('#typeFilter input[type="checkbox"]').forEach(cb => {
         cb.addEventListener('change', () => {
           const label = cb.getAttribute('data-label');
