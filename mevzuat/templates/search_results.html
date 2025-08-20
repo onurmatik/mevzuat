@@ -42,6 +42,7 @@
   </div>
   <div class="col-md-3">
     <div class="border rounded p-3 mb-4 d-none" id="infoBox">
+      <div id="resultCount" class="mb-3"></div>
       <div class="mb-3">
         <h5>Sort by</h5>
         <select id="sortSelect" class="form-select">
@@ -70,6 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsDiv = document.getElementById('searchResults');
   const sortSelect = document.getElementById('sortSelect');
   const infoBox = document.getElementById('infoBox');
+  const resultCountDiv = document.getElementById('resultCount');
   const typeCountsDiv = document.getElementById('typeCounts');
   const dateCountsDiv = document.getElementById('dateCounts');
   const typeMap = {};
@@ -131,11 +133,14 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateInfoBox() {
     if (!allResults.length) {
       infoBox.classList.add('d-none');
+      resultCountDiv.innerHTML = '';
       typeCountsDiv.innerHTML = '';
       dateCountsDiv.innerHTML = '';
       return;
     }
     infoBox.classList.remove('d-none');
+
+    resultCountDiv.innerHTML = `<h6>Total Results</h6><p>${allResults.length}</p>`;
 
     const typeCounts = {};
     allResults.forEach(d => {
@@ -260,6 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hasMore = false;
     allResults = [];
     infoBox.classList.add('d-none');
+    resultCountDiv.innerHTML = '';
     typeCountsDiv.innerHTML = '';
     dateCountsDiv.innerHTML = '';
     await fetchResults(false);
