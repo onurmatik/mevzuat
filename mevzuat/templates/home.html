@@ -11,20 +11,6 @@
 
 {% block content %}
 <div class="bg-body-tertiary rounded p-3 mb-4">
-  <div class="mb-3">
-    <div id="typeFilter" class="btn-group" role="group"></div>
-  </div>
-  <div class="mb-3">
-    <div id="rangeButtons" class="btn-group me-2" role="group">
-      <button type="button" class="btn btn-outline-secondary active" data-range="all">All</button>
-      <button type="button" class="btn btn-outline-secondary" data-range="thisYear">This Year</button>
-      <button type="button" class="btn btn-outline-secondary" data-range="lastYear">Last Year</button>
-      <button type="button" class="btn btn-outline-secondary" data-range="30days">30 Days</button>
-      <button type="button" class="btn btn-outline-secondary" data-range="custom">Custom</button>
-    </div>
-    <input type="date" class="form-control d-inline-block me-2 d-none" id="startDate">
-    <input type="date" class="form-control d-inline-block d-none" id="endDate">
-  </div>
   <form class="d-flex" id="searchForm">
     <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search" id="searchInput">
     <button class="btn btn-outline-success" type="submit">Search</button>
@@ -36,7 +22,13 @@
     <canvas id="documentsChart" height="150"></canvas>
   </div>
   <div class="col-lg-4">
-    <div id="chartLegend" class="small"></div>
+    <div id="chartLegend" class="small mb-3"></div>
+    <div id="rangeButtons" class="btn-group" role="group">
+      <button type="button" class="btn btn-outline-secondary active" data-range="all">All</button>
+      <button type="button" class="btn btn-outline-secondary" data-range="thisYear">This Year</button>
+      <button type="button" class="btn btn-outline-secondary" data-range="lastYear">Last Year</button>
+      <button type="button" class="btn btn-outline-secondary" data-range="30days">30 Days</button>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -46,26 +38,13 @@
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     const palette = ['#0d6efd','#6c757d','#198754','#dc3545','#ffc107','#0dcaf0','#6610f2','#d63384','#20c997','#fd7e14'];
-    const typeFilter = document.getElementById('typeFilter');
     const rangeButtons = document.getElementById('rangeButtons');
     let currentRange = 'all';
-    const startDateInput = document.getElementById('startDate');
-    const endDateInput = document.getElementById('endDate');
     const legend = document.getElementById('chartLegend');
     const searchForm = document.getElementById('searchForm');
     const searchInput = document.getElementById('searchInput');
     let chart;
-    const typeMap = {}; // label -> {id, slug, color, visible}
-
-    function slugify(str) {
-      return str
-        .toString()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-    }
+    const typeMap = {}; // label -> {id, color}
 
     loadTypes();
 
@@ -74,20 +53,7 @@
         const res = await fetch('/api/documents/types');
         const types = await res.json();
         types.forEach((t, idx) => {
-          const slug = slugify(t.label);
-          typeMap[t.label] = { id: t.id, slug, color: palette[idx % palette.length], visible: true };
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'btn btn-outline-secondary active';
-          btn.textContent = t.label;
-          btn.setAttribute('data-label', t.label);
-          typeFilter.appendChild(btn);
-          btn.addEventListener('click', () => {
-            btn.classList.toggle('active');
-            const label = btn.getAttribute('data-label');
-            typeMap[label].visible = btn.classList.contains('active');
-            updateChart();
-          });
+          typeMap[t.label] = { id: t.id, color: palette[idx % palette.length] };
         });
         updateChart();
       } catch (err) {
@@ -114,10 +80,6 @@
         start = past.toISOString().split('T')[0];
         end = today.toISOString().split('T')[0];
         interval = 'day';
-      } else if (opt === 'custom') {
-        start = startDateInput.value;
-        end = endDateInput.value;
-        interval = 'day';
       }
       return { start, end, interval };
     }
@@ -134,17 +96,17 @@
 
     async function updateChart() {
       const rows = await fetchCounts();
-      const visibleLabels = Object.keys(typeMap).filter(k => typeMap[k].visible);
+      const labels = Object.keys(typeMap);
       const periods = Array.from(new Set(rows.map(r => r.period))).sort();
       const datasetMap = {};
-      visibleLabels.forEach(l => datasetMap[l] = Array(periods.length).fill(0));
+      labels.forEach(l => datasetMap[l] = Array(periods.length).fill(0));
       rows.forEach(r => {
         const idx = periods.indexOf(r.period);
         if (idx !== -1 && datasetMap[r.type] !== undefined) {
           datasetMap[r.type][idx] = r.count;
         }
       });
-      const datasets = visibleLabels.map(l => ({
+      const datasets = labels.map(l => ({
         label: l,
         data: datasetMap[l],
         backgroundColor: typeMap[l].color,
@@ -182,42 +144,29 @@
       let html = `<div class="mb-2"><strong>Date Range:</strong> ${first} – ${last}</div>`;
       html += '<ul class="list-unstyled">';
       Object.keys(typeMap).forEach(label => {
-        if (typeMap[label].visible) {
-          html += `<li class="legend-item"><span class="legend-color" style="background:${typeMap[label].color}"></span>${label}: ${totals[label] || 0}</li>`;
-        }
+        html += `<li class="legend-item"><span class="legend-color" style="background:${typeMap[label].color}"></span>${label}: ${totals[label] || 0}</li>`;
       });
       html += '</ul>';
       legend.innerHTML = html;
     }
 
-    rangeButtons.querySelectorAll('button').forEach(btn => {
-      btn.addEventListener('click', () => {
-        rangeButtons.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        currentRange = btn.getAttribute('data-range');
-        const custom = currentRange === 'custom';
-        startDateInput.classList.toggle('d-none', !custom);
-        endDateInput.classList.toggle('d-none', !custom);
-        updateChart();
+      rangeButtons.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          rangeButtons.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentRange = btn.getAttribute('data-range');
+          updateChart();
+        });
       });
-    });
-    startDateInput.addEventListener('change', () => updateChart());
-    endDateInput.addEventListener('change', () => updateChart());
 
     searchForm.addEventListener('submit', e => {
       e.preventDefault();
       const q = searchInput.value.trim();
       if (!q) return;
-      const selectedSlugs = Object.keys(typeMap)
-        .filter(label => typeMap[label].visible)
-        .map(label => typeMap[label].slug);
       const params = new URLSearchParams({ query: q });
       const { start, end } = getRange();
       if (start) params.set('start_date', start);
       if (end) params.set('end_date', end);
-      if (selectedSlugs.length === 1) {
-        params.set('type', selectedSlugs[0]);
-      }
       window.location.href = '/search?' + params.toString();
     });
   });
