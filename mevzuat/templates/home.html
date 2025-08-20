@@ -18,13 +18,44 @@
   <div class="col-lg-4">
     <div id="chartLegend" class="small mb-3"></div>
     <div id="rangeButtons" class="btn-group" role="group">
-      <button type="button" class="btn btn-outline-secondary active" data-range="all">All</button>
-      <button type="button" class="btn btn-outline-secondary" data-range="thisYear">This Year</button>
+      <button type="button" class="btn btn-outline-secondary active" data-range="30days">30 Days</button>
       <button type="button" class="btn btn-outline-secondary" data-range="lastYear">Last Year</button>
-      <button type="button" class="btn btn-outline-secondary" data-range="30days">30 Days</button>
+      <button type="button" class="btn btn-outline-secondary" data-range="thisYear">This Year</button>
+      <button type="button" class="btn btn-outline-secondary" data-range="all">All</button>
     </div>
   </div>
 </div>
+
+<hr class="my-5">
+<div class="row">
+  <div class="col-12">
+    <h2 class="fs-4">API Access</h2>
+    <p>You can access our data programmatically through the available API endpoints. Full interactive documentation is available at <a href="/api/docs">/api/docs</a>.</p>
+    <ul>
+      <li><code>GET /api/documents/types</code> — List all available document types.</li>
+      <li><code>GET /api/documents/counts</code> — Get counts of documents by type over a time interval.</li>
+      <li><code>GET /api/documents/list</code> — List documents with filters such as type, year, month, or date range.</li>
+      <li><code>GET /api/documents/search</code> — Search documents with optional filters like type and date range.</li>
+    </ul>
+  </div>
+</div>
+
+<hr class="my-5">
+<div class="row">
+  <div class="col-12">
+    <h2 class="fs-4">MCP Access</h2>
+    <p>The same functionality is also available through <strong>Model Context Protocol (MCP)</strong> tools. This allows you to integrate document data directly into AI-powered workflows.</p>
+    <p>The MCP server is available at: <code>https://mevzuat.info/mcp/</code></p>
+    <ul>
+      <li><code>types</code> — List all available document types.</li>
+      <li><code>counts</code> — Get counts of documents by type over a time interval.</li>
+      <li><code>list</code> — List documents with filters such as type, year, month, or date range.</li>
+      <li><code>search</code> — Search documents with optional filters like type and date range.</li>
+    </ul>
+    <p>Refer to the <a href="/api/docs">API documentation</a> for detailed parameter descriptions, which also apply when using these tools via MCP.</p>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -33,7 +64,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     const palette = ['#0d6efd','#6c757d','#198754','#dc3545','#ffc107','#0dcaf0','#6610f2','#d63384','#20c997','#fd7e14'];
     const rangeButtons = document.getElementById('rangeButtons');
-    let currentRange = 'all';
+    let currentRange = '30days';
     const legend = document.getElementById('chartLegend');
     const searchForm = document.getElementById('searchForm');
     const searchInput = document.getElementById('searchInput');
