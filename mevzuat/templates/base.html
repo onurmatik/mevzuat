@@ -16,13 +16,12 @@
     <nav class="navbar navbar-light bg-light border-bottom fixed-top">
       <div class="container d-flex align-items-center">
         <a class="navbar-brand fw-semibold" href="{% url 'home' %}">Mevzuat.info</a>
-        <a href="https://github.com/onurmatik/mevzuat/" class="ms-3 text-decoration-none" target="_blank" rel="noopener" aria-label="GitHub repository">
-          <i class="bi bi-github"></i>
-        </a>
+
         <form class="d-flex ms-auto" id="searchForm" action="{% url 'search' %}" method="get">
           <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search" id="searchInput" name="query">
           <button class="btn btn-outline-success" type="submit">Search</button>
         </form>
+
       </div>
     </nav>
 
