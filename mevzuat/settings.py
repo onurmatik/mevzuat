@@ -163,7 +163,6 @@ else:
 
 # Static files directory for development
 STATICFILES_DIRS = [
-    BASE_DIR / "frontend" / "out",
     BASE_DIR / "static",
 ]
 

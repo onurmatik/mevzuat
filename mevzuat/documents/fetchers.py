@@ -166,8 +166,7 @@ class MevzuatFetcher(BaseDocFetcher):
 
     def fetch_and_store_document(self, doc, *, overwrite: bool = False, timeout: int = 30) -> "models.FileField":
         """
-        Download the PDF at ``self.original_document_url()`` and save it into
-        ``self.document``.
+        Download the PDF at ``self.original_document_url()`` and save it into ``self.document``.
 
         Parameters
         ----------
