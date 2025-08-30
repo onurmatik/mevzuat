@@ -402,7 +402,9 @@ class Command(BaseCommand):
 
         # Session / CSRF
         parser.add_argument("--cookie-header", help="Verbatim Cookie header string to send on every POST")
-        parser.add_argument("--cookies", help="Cookie jar string 'a=b; c=d; ...' to load into session")
+        parser.add_argument("--cookies",
+                            default=".AspNetCore.Antiforgery.Pk46jo02iDM=CfDJ8PCQ8f3V401KkEuh7WCYGAGaRsxhQrc40y4dzrtFRjp5uAraMpR-87iyW8QxXHwgfnGf6iAUSZj7w4hzRFR6rhn4mmEnauiitgCwmHfQChhYDJAgezsmVkYC67l8ZggRqgpiWTmQLP_eXHjkrKzsgHo; _ga=GA1.1.1072477466.1753783579; _ga_K30R4B6KS2=GS2.1.s1753851984$o5$g1$t1753853382$j59$l0$h0; .AspNetCore.Mvc.CookieTempDataProvider=CfDJ8PCQ8f3V401KkEuh7WCYGAECcEGSI3h7mpd7bXJI0nlgBwvXe2Zb472k9qWVpDhQEChEtbGgEOWk6ZsEvT_Lx6p5Zzn-blhx-N0UA8rqsnpBjs3hjCoFDsMXPWioyobSX7UO4ZIp01KzBrZ7MO_GkPM",
+                            help="Cookie jar string 'a=b; c=d; ...' to load into session")
         parser.add_argument("--antiforgery", help="Explicit antiforgery token to use")
         parser.add_argument("--referer", default="/", help="Referer path or URL (default '/')")
 
