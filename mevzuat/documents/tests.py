@@ -8,7 +8,7 @@ from django.contrib import admin, messages
 from django.core.files.base import ContentFile
 from django.test import TestCase, override_settings, RequestFactory
 
-from .admin import DocumentAdmin
+from .admin import DocumentAdmin, MevzuatTertibFilter
 from .models import Document, DocumentType, VectorStore
 
 
@@ -240,6 +240,12 @@ class DocumentSearchAPITest(TestCase):
         calls = instance.vector_stores.search.call_args_list
         self.assertEqual(calls[0].kwargs["max_num_results"], 3)
         self.assertEqual(calls[1].kwargs["max_num_results"], 5)
+
+
+class DocumentAdminConfigTest(TestCase):
+    def test_mevzuat_tertib_in_admin_lists(self):
+        self.assertIn("mevzuat_tertib", DocumentAdmin.list_display)
+        self.assertIn(MevzuatTertibFilter, DocumentAdmin.list_filter)
 
 
 class DocumentAdminActionErrorTest(TestCase):

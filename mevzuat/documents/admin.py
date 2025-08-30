@@ -61,11 +61,31 @@ class InVectorStoreFilter(admin.SimpleListFilter):
         return queryset
 
 
+class MevzuatTertibFilter(admin.SimpleListFilter):
+    title = "Mevzuat tertib"
+    parameter_name = "mevzuat_tertib"
+
+    def lookups(self, request, model_admin):
+        values = (
+            Document.objects.values_list("metadata__mevzuat_tertib", flat=True)
+            .distinct()
+            .order_by("metadata__mevzuat_tertib")
+        )
+        return [(v, str(v)) for v in values if v not in (None, "")]
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        if val:
+            return queryset.filter(metadata__mevzuat_tertib=val)
+        return queryset
+
+
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
     list_display = (
         "title",
         "mevzuat_no",
+        "mevzuat_tertib",
         "type",
         "date",
         "has_pdf",
@@ -75,6 +95,7 @@ class DocumentAdmin(admin.ModelAdmin):
     list_filter = (
         "type",
         "date",
+        MevzuatTertibFilter,
         HasPdfFilter,
         InVectorStoreFilter,
         HasMdFilter,
@@ -88,6 +109,9 @@ class DocumentAdmin(admin.ModelAdmin):
 
     def mevzuat_no(self, obj):
         return obj.metadata.get("mevzuat_no")
+
+    def mevzuat_tertib(self, obj):
+        return obj.metadata.get("mevzuat_tertib")
 
     def resmi_gazete_tarihi(self, obj):
         return obj.metadata.get("resmi_gazete_tarihi")
