@@ -5,15 +5,19 @@ from datetime import datetime
 import requests
 from django.core.files.base import ContentFile
 from django.db import transaction, models
+from django.db.models import F
 
 
 class BaseDocFetcher(abc.ABC):
     """Common interface for every fetcher."""
     @abc.abstractmethod
-    def original_document_url(self, doc) -> str: ...
+    def build_document_url(self, doc) -> str: ...
 
     @abc.abstractmethod
     def extract_metadata(self, doc) -> dict: ...
+
+    @abc.abstractmethod
+    def get_last_document(self) -> "Document": ...
 
     @abc.abstractmethod
     def fetch_and_store_document(
@@ -157,7 +161,20 @@ def get(name: str) -> BaseDocFetcher:
 
 @register
 class MevzuatFetcher(BaseDocFetcher):
-    def original_document_url(self, doc):
+    mevzuat_tur = 1  # Defaults to Kanun; child classes override
+
+    def get_last_document(self):
+        """Return the doc with the Get max of the metadata['mevzuat_tertib'] and max of the metadata['mevzuat_no']"""
+        from .models import Document
+        return (
+            Document.objects
+            .filter(metadata__mevzuat_tur=self.mevzuat_tur)
+            .annotate(mevzuat_no=F('metadata__mevzuat_no'))
+            .order_by('-mevzuat_no')
+            .first()
+        )
+
+    def build_document_url(self, doc):
         uri = f"{doc.metadata['mevzuat_tur']}.{doc.metadata['mevzuat_tertib']}.{doc.metadata['mevzuat_no']}.pdf"
         return f"https://www.mevzuat.gov.tr/MevzuatMetin/{uri}"
 
@@ -166,7 +183,8 @@ class MevzuatFetcher(BaseDocFetcher):
 
     def fetch_and_store_document(self, doc, *, overwrite: bool = False, timeout: int = 30) -> "models.FileField":
         """
-        Download the PDF at ``self.original_document_url()`` and save it into ``self.document``.
+        Download the PDF at ``self.build_document_url()`` and save it into
+        ``self.document``.
 
         Parameters
         ----------
@@ -190,9 +208,9 @@ class MevzuatFetcher(BaseDocFetcher):
         if doc.document and not overwrite:
             return doc.document
 
-        pdf_url = self.original_document_url(doc)
+        pdf_url = self.build_document_url(doc)
         if not pdf_url:
-            raise ValueError("original_document_url() returned an empty URL")
+            raise ValueError("build_document_url() returned an empty URL")
 
         default_headers = {
             "User-Agent": (
@@ -223,22 +241,46 @@ class MevzuatFetcher(BaseDocFetcher):
 
 
 @register
+class KanunFetcher(MevzuatFetcher):
+    mevzuat_tur = 1
+
+
+@register
+class KHKFetcher(MevzuatFetcher):
+    mevzuat_tur = 2
+
+
+@register
+class CBKararnameFetcher(MevzuatFetcher):
+    mevzuat_tur = 3
+
+
+@register
+class CBKararFetcher(MevzuatFetcher):
+    mevzuat_tur = 4
+
+
+@register
+class CBYonetmelikFetcher(MevzuatFetcher):
+    mevzuat_tur = 5
+
+
+@register
 class YonetmelikFetcher(MevzuatFetcher):
     # For mevzuat_tur;
     #  - 7: Kurum Yönetmeliği
     #  - 8: Kurum Yönetmeliği (Üniversite)
     #  - 9: Tebliğ
 
-    def build_original_url(self, doc):
+    def build_document_url(self, doc):
         uri = f"yonetmelik/{doc.metadata['mevzuat_tur']}.{doc.metadata['mevzuat_tertib']}.{doc.metadata['mevzuat_no']}.pdf"
         return f"https://www.mevzuat.gov.tr/MevzuatMetin/{uri}"
 
 
 @register
 class CBGenelgeFetcher(MevzuatFetcher):
-    # For mevzuat_tur;
-    #  - 22: Cumhurbaşkanlığı Genelgesi
+    mevzuat_tur = 6
 
-    def build_original_url(self, doc):
+    def build_document_url(self, doc):
         uri = f"CumhurbaskanligiGenelgeleri/{doc.metadata['resmi_gazete_tarihi'].strftime('%Y%m%d')}-{doc.metadata['mevzuat_no']}.pdf"
         return f"https://www.mevzuat.gov.tr/MevzuatMetin/{uri}"

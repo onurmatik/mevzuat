@@ -46,6 +46,13 @@ class DocumentType(models.Model):
     def document_count(self):
         return self.documents.count()
 
+    def _fetcher(self):
+        from .fetchers import get
+        return get(self.fetcher)
+
+    def last_document(self):
+        return self._fetcher().get_last_document()
+
 
 def document_upload_to(instance, filename):
     # Upload path for the original doc and its markdown version
@@ -94,7 +101,7 @@ class Document(models.Model):
 
     @cached_property
     def original_document_url(self):
-        return self._fetcher().build_original_url(self)
+        return self._fetcher().build_document_url(self)
 
     def enrich_metadata(self, pdf_bytes=None):
         extra = self._fetcher().extract_metadata(self)
