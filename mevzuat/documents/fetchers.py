@@ -181,6 +181,11 @@ class MevzuatFetcher(BaseDocFetcher):
         uri = f"{doc.metadata['mevzuat_tur']}.{doc.metadata['mevzuat_tertib']}.{doc.metadata['mevzuat_no']}.pdf"
         return f"https://www.mevzuat.gov.tr/MevzuatMetin/{uri}"
 
+    def build_next_document_url(self, offset=1):
+        doc = self.get_last_document()
+        uri = f"{doc.metadata['mevzuat_tur']}.{doc.metadata['mevzuat_tertib']}.{doc.metadata['mevzuat_no'] + offset}.pdf"
+        return f"https://www.mevzuat.gov.tr/MevzuatMetin/{uri}"
+
     def get_document_date(self, doc):
         return datetime.strptime(doc.metadata['resmi_gazete_tarihi'], '%Y-%m-%d').date()
 
