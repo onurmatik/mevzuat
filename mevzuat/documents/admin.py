@@ -76,7 +76,7 @@ class MevzuatTertibFilter(admin.SimpleListFilter):
     def queryset(self, request, queryset):
         val = self.value()
         if val:
-            return queryset.filter(metadata__mevzuat_tertib=val)
+            return queryset.filter(metadata__mevzuat_tertib=int(val))
         return queryset
 
 
