@@ -164,13 +164,16 @@ class MevzuatFetcher(BaseDocFetcher):
     mevzuat_tur = 1  # Defaults to Kanun; child classes override
 
     def get_last_document(self):
-        """Return the doc with the Get max of the metadata['mevzuat_tertib'] and max of the metadata['mevzuat_no']"""
+        """Return the document with the highest ``mevzuat_tertib`` and ``mevzuat_no`` for the ``mevzuat_tur``."""
         from .models import Document
         return (
             Document.objects
             .filter(metadata__mevzuat_tur=self.mevzuat_tur)
-            .annotate(mevzuat_no=F('metadata__mevzuat_no'))
-            .order_by('-mevzuat_no')
+            .annotate(
+                mevzuat_tertib=F("metadata__mevzuat_tertib"),
+                mevzuat_no=F("metadata__mevzuat_no"),
+            )
+            .order_by("-mevzuat_tertib", "-mevzuat_no")
             .first()
         )
 
@@ -247,22 +250,31 @@ class KanunFetcher(MevzuatFetcher):
 
 @register
 class KHKFetcher(MevzuatFetcher):
-    mevzuat_tur = 2
-
-
-@register
-class CBKararnameFetcher(MevzuatFetcher):
-    mevzuat_tur = 3
-
-
-@register
-class CBKararFetcher(MevzuatFetcher):
     mevzuat_tur = 4
 
 
 @register
+class CBKararnameFetcher(MevzuatFetcher):
+    mevzuat_tur = 19
+
+
+@register
+class CBKararFetcher(MevzuatFetcher):
+    mevzuat_tur = 20
+
+
+@register
 class CBYonetmelikFetcher(MevzuatFetcher):
-    mevzuat_tur = 5
+    mevzuat_tur = 21
+
+
+@register
+class CBGenelgeFetcher(MevzuatFetcher):
+    mevzuat_tur = 22
+
+    def build_document_url(self, doc):
+        uri = f"CumhurbaskanligiGenelgeleri/{doc.metadata['resmi_gazete_tarihi'].strftime('%Y%m%d')}-{doc.metadata['mevzuat_no']}.pdf"
+        return f"https://www.mevzuat.gov.tr/MevzuatMetin/{uri}"
 
 
 @register
@@ -274,13 +286,4 @@ class YonetmelikFetcher(MevzuatFetcher):
 
     def build_document_url(self, doc):
         uri = f"yonetmelik/{doc.metadata['mevzuat_tur']}.{doc.metadata['mevzuat_tertib']}.{doc.metadata['mevzuat_no']}.pdf"
-        return f"https://www.mevzuat.gov.tr/MevzuatMetin/{uri}"
-
-
-@register
-class CBGenelgeFetcher(MevzuatFetcher):
-    mevzuat_tur = 6
-
-    def build_document_url(self, doc):
-        uri = f"CumhurbaskanligiGenelgeleri/{doc.metadata['resmi_gazete_tarihi'].strftime('%Y%m%d')}-{doc.metadata['mevzuat_no']}.pdf"
         return f"https://www.mevzuat.gov.tr/MevzuatMetin/{uri}"

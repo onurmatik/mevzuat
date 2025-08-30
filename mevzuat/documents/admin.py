@@ -11,6 +11,7 @@ class VectorStoreAdmin(admin.ModelAdmin):
 @admin.register(DocumentType)
 class DocumentTypeAdmin(admin.ModelAdmin):
     list_display = ('name', 'short_name', 'slug', 'fetcher', 'document_count', 'vector_store')
+    list_editable = ('fetcher',)
 
 
 class HasPdfFilter(admin.SimpleListFilter):
@@ -61,6 +62,25 @@ class InVectorStoreFilter(admin.SimpleListFilter):
         return queryset
 
 
+class MevzuatTurFilter(admin.SimpleListFilter):
+    title = "Mevzuat tur"
+    parameter_name = "mevzuat_tur"
+
+    def lookups(self, request, model_admin):
+        values = (
+            Document.objects.values_list("metadata__mevzuat_tur", flat=True)
+            .distinct()
+            .order_by("metadata__mevzuat_tur")
+        )
+        return [(v, str(v)) for v in values if v not in (None, "")]
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        if val:
+            return queryset.filter(metadata__mevzuat_tur=int(val))
+        return queryset
+
+
 class MevzuatTertibFilter(admin.SimpleListFilter):
     title = "Mevzuat tertib"
     parameter_name = "mevzuat_tertib"
@@ -84,8 +104,9 @@ class MevzuatTertibFilter(admin.SimpleListFilter):
 class DocumentAdmin(admin.ModelAdmin):
     list_display = (
         "title",
-        "mevzuat_no",
+        "mevzuat_tur",
         "mevzuat_tertib",
+        "mevzuat_no",
         "type",
         "date",
         "has_pdf",
@@ -95,6 +116,7 @@ class DocumentAdmin(admin.ModelAdmin):
     list_filter = (
         "type",
         "date",
+        MevzuatTurFilter,
         MevzuatTertibFilter,
         HasPdfFilter,
         InVectorStoreFilter,
@@ -112,6 +134,9 @@ class DocumentAdmin(admin.ModelAdmin):
 
     def mevzuat_tertib(self, obj):
         return obj.metadata.get("mevzuat_tertib")
+
+    def mevzuat_tur(self, obj):
+        return obj.metadata.get("mevzuat_tur")
 
     def resmi_gazete_tarihi(self, obj):
         return obj.metadata.get("resmi_gazete_tarihi")
