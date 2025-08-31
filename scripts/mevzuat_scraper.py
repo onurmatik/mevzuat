@@ -7,9 +7,6 @@ https://www.mevzuat.gov.tr/Anasayfa/MevzuatDatatable and dump to JSON.
 
 This version **automates** antiforgery token handling and stops after the first
 page-size batch of rows.
-
-Requirements:
-    pip install requests
 """
 
 from __future__ import annotations

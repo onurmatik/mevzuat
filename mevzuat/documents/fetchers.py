@@ -251,31 +251,85 @@ class MevzuatFetcher(BaseDocFetcher):
 @register
 class KanunFetcher(MevzuatFetcher):
     mevzuat_tur = 1
+    request_params = {
+        "MevzuatTur": "Kanun",
+        "YonetmelikMevzuatTur": "OsmanliKanunu",
+        "AranacakIfade": "",
+        "AranacakYer": "2",
+        "MevzuatNo": "",
+        "BaslangicTarihi": "",
+        "BitisTarihi": "",
+    }
 
 
 @register
 class KHKFetcher(MevzuatFetcher):
     mevzuat_tur = 4
+    request_params = {
+        "MevzuatTur": "KHK",
+        "YonetmelikMevzuatTur": "OsmanliKanunu",
+        "AranacakIfade": "",
+        "AranacakYer": "2",
+        "MevzuatNo": "",
+        "BaslangicTarihi": "",
+        "BitisTarihi": "",
+    }
 
 
 @register
 class CBKararnameFetcher(MevzuatFetcher):
     mevzuat_tur = 19
+    request_params = {
+        "MevzuatTur": "CumhurbaskaniKararnameleri",
+        "YonetmelikMevzuatTur": "OsmanliKanunu",
+        "AranacakIfade": "",
+        "AranacakYer": "2",
+        "MevzuatNo": "",
+        "BaslangicTarihi": "",
+        "BitisTarihi": "",
+    }
 
 
 @register
 class CBKararFetcher(MevzuatFetcher):
     mevzuat_tur = 20
+    request_params = {
+        "MevzuatTur": "CumhurbaskaniKararlari",
+        "YonetmelikMevzuatTur": "OsmanliKanunu",
+        "AranacakIfade": "",
+        "AranacakYer": "2",
+        "MevzuatNo": "",
+        "BaslangicTarihi": "",
+        "BitisTarihi": "",
+    }
 
 
 @register
 class CBYonetmelikFetcher(MevzuatFetcher):
+    request_params = {
+        "MevzuatTur": "CumhurbaskanligiVeBakanlarKuruluYonetmelik",
+        "YonetmelikMevzuatTur": "CumhurbaskanligiVeBakanlarKuruluYonetmelik",
+        "AranacakIfade": "",
+        "AranacakYer": "2",
+        "MevzuatNo": "",
+        "BaslangicTarihi": "",
+        "BitisTarihi": "",
+    }
     mevzuat_tur = 21
 
 
 @register
 class CBGenelgeFetcher(MevzuatFetcher):
     mevzuat_tur = 22
+    request_params = {
+        "MevzuatTur": "CumhurbaskanligiGenelgeleri",
+        "YonetmelikMevzuatTur": "OsmanliKanunu",
+        "AranacakIfade": "",
+        "AranacakYer": "Baslik",
+        "MevzuatNo": "",
+        "BaslangicTarihi": "",
+        "BitisTarihi": "",
+    }
 
     def build_document_url(self, doc):
         uri = f"CumhurbaskanligiGenelgeleri/{doc.metadata['resmi_gazete_tarihi']}-{doc.metadata['mevzuat_no']}.pdf"
