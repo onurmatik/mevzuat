@@ -183,7 +183,7 @@ class MevzuatFetcher(BaseDocFetcher):
 
     def build_next_document_url(self, offset=1):
         doc = self.get_last_document()
-        uri = f"{doc.metadata['mevzuat_tur']}.{doc.metadata['mevzuat_tertib']}.{doc.metadata['mevzuat_no'] + offset}.pdf"
+        uri = f"{doc.metadata['mevzuat_tur']}.{doc.metadata['mevzuat_tertib']}.{int(doc.metadata['mevzuat_no']) + offset}.pdf"
         return f"https://www.mevzuat.gov.tr/MevzuatMetin/{uri}"
 
     def get_document_date(self, doc):
@@ -278,7 +278,7 @@ class CBGenelgeFetcher(MevzuatFetcher):
     mevzuat_tur = 22
 
     def build_document_url(self, doc):
-        uri = f"CumhurbaskanligiGenelgeleri/{doc.metadata['resmi_gazete_tarihi'].strftime('%Y%m%d')}-{doc.metadata['mevzuat_no']}.pdf"
+        uri = f"CumhurbaskanligiGenelgeleri/{doc.metadata['resmi_gazete_tarihi']}-{doc.metadata['mevzuat_no']}.pdf"
         return f"https://www.mevzuat.gov.tr/MevzuatMetin/{uri}"
 
 

@@ -109,6 +109,7 @@ class DocumentAdmin(admin.ModelAdmin):
         "mevzuat_no",
         "type",
         "date",
+        "created_at",
         "has_pdf",
         "in_vs",
         "has_md",

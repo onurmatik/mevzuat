@@ -34,23 +34,40 @@ class Command(BaseCommand):
         if not last_doc:
             raise CommandError("No existing document found for this type")
 
+        default_headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/125.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/pdf,application/octet-stream;q=0.9,*/*;q=0.8",
+            "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Referer": "https://www.mevzuat.gov.tr/",
+            "Connection": "keep-alive",
+        }
+
         found_offset = None
         for offset in range(1, max_offset + 1):
             url = fetcher.build_next_document_url(offset=offset)
             try:
-                resp = requests.head(url, timeout=15)
-                if resp.status_code == 200:
-                    found_offset = offset
-                    break
-            except requests.RequestException:
-                # If the request fails, try the next offset
-                continue
+                resp = requests.head(url, headers=default_headers)
+                resp.raise_for_status()
+            except requests.HTTPError as exc:
+                if exc.response is not None and exc.response.status_code == 404:
+                    # Document not found, try the next offset
+                    continue
+                raise
+            except requests.RequestException as exc:
+                raise CommandError(f"Failed to request {url}") from exc
+            else:
+                found_offset = offset
+                break
 
         if found_offset is None:
             self.stdout.write(self.style.WARNING("No new document found"))
             return
 
-        new_no = last_doc.metadata["mevzuat_no"] + found_offset
+        new_no = int(last_doc.metadata["mevzuat_no"]) + found_offset
         metadata = {
             "mevzuat_tur": last_doc.metadata["mevzuat_tur"],
             "mevzuat_tertib": last_doc.metadata["mevzuat_tertib"],

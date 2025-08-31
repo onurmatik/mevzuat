@@ -53,6 +53,9 @@ class DocumentType(models.Model):
     def last_document(self):
         return self._fetcher().get_last_document()
 
+    def next_document_url(self, offset=1):
+        return self._fetcher().build_next_document_url(offset)
+
 
 def document_upload_to(instance, filename):
     # Upload path for the original doc and its markdown version
