@@ -343,3 +343,22 @@ class DocumentSyncWithVectorStoreStorageTest(TestCase):
         self.assertTrue(file_arg[0].endswith(".pdf"))
         self.assertEqual(file_arg[1], b"a")
         client.vector_stores.files.create.assert_called_once()
+
+
+class FetchNewCommandTest(TestCase):
+    @patch("mevzuat.documents.management.commands.fetch_new.fetch_documents")
+    def test_fetches_all_active_document_types(self, mock_fetch):
+        mock_fetch.return_value = [
+            {"mevzuatNo": "1"},
+            {"mevzuatNo": "2"},
+        ]
+        dt_active1 = DocumentType.objects.create(name="Active 1", fetcher="KanunFetcher", active=True)
+        dt_active2 = DocumentType.objects.create(name="Active 2", fetcher="KanunFetcher", active=True)
+        dt_inactive = DocumentType.objects.create(name="Inactive", fetcher="KanunFetcher", active=False)
+
+        call_command("fetch_new")
+
+        self.assertEqual(mock_fetch.call_count, 2)
+        self.assertEqual(Document.objects.filter(type=dt_active1).count(), 2)
+        self.assertEqual(Document.objects.filter(type=dt_active2).count(), 2)
+        self.assertEqual(Document.objects.filter(type=dt_inactive).count(), 0)
