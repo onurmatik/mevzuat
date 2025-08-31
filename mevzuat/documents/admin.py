@@ -10,8 +10,8 @@ class VectorStoreAdmin(admin.ModelAdmin):
 
 @admin.register(DocumentType)
 class DocumentTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'short_name', 'slug', 'fetcher', 'document_count', 'vector_store')
-    list_editable = ('fetcher',)
+    list_display = ('name', 'short_name', 'slug', 'active', 'fetcher', 'document_count', 'vector_store')
+    list_editable = ('fetcher', 'active')
 
 
 class HasPdfFilter(admin.SimpleListFilter):

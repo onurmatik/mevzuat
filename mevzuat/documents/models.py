@@ -23,6 +23,9 @@ class DocumentType(models.Model):
     short_name = models.CharField(max_length=100, unique=True, blank=True, null=True)
     slug = models.SlugField(unique=True, blank=True)
     description = models.TextField(blank=True)
+
+    active = models.BooleanField(default=True)
+
     vector_store = models.ForeignKey(
         VectorStore, on_delete=models.SET_NULL,
         null=True, blank=True
@@ -50,16 +53,19 @@ class DocumentType(models.Model):
         from .fetchers import get
         return get(self.fetcher)
 
-    def last_document(self):
-        return self._fetcher().get_last_document()
-
-    def next_document_url(self, offset=1):
-        return self._fetcher().build_next_document_url(offset)
-
 
 def document_upload_to(instance, filename):
     # Upload path for the original doc and its markdown version
     return f"{instance.type.slug}/{instance.document_date.year}/{filename}"
+
+
+def parse_date(effective_date: str):
+    for fmt in ("%d.%m.%Y", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(effective_date, fmt).date()
+        except ValueError:
+            continue
+    raise ValueError(f"Date {effective_date!r} is not in an accepted format")
 
 
 class Document(models.Model):
@@ -78,7 +84,12 @@ class Document(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
-        self.date = datetime.strptime(self.metadata['resmi_gazete_tarihi'], '%Y-%m-%d').date()
+        title = self.metadata.get('mevAdi')
+        if title:
+            self.title = title
+        effective_date = self.metadata.get('resmiGazeteTarihi')
+        if effective_date:
+            self.date = parse_date(effective_date)
         super().save(*args, **kwargs)
 
     class Meta:
