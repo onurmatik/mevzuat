@@ -362,3 +362,20 @@ class FetchNewCommandTest(TestCase):
         self.assertEqual(Document.objects.filter(type=dt_active1).count(), 2)
         self.assertEqual(Document.objects.filter(type=dt_active2).count(), 2)
         self.assertEqual(Document.objects.filter(type=dt_inactive).count(), 0)
+
+
+class SyncVectorstoreCommandTest(TestCase):
+    @patch("mevzuat.documents.models.Document.sync_with_vectorstore", autospec=True)
+    def test_syncs_unprocessed_active_documents(self, mock_sync):
+        dt_active = DocumentType.objects.create(name="Active", fetcher="KanunFetcher", active=True)
+        dt_inactive = DocumentType.objects.create(name="Inactive", fetcher="KanunFetcher", active=False)
+        doc1 = Document.objects.create(title="Doc1", type=dt_active)
+        doc2 = Document.objects.create(title="Doc2", type=dt_active, oai_file_id="")
+        Document.objects.create(title="Doc3", type=dt_active, oai_file_id="file-1")
+        Document.objects.create(title="Doc4", type=dt_inactive)
+
+        call_command("sync_vectorstore")
+
+        self.assertEqual(mock_sync.call_count, 2)
+        called_pks = {call.args[0].pk for call in mock_sync.call_args_list}
+        self.assertEqual(called_pks, {doc1.pk, doc2.pk})
