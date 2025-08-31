@@ -28,23 +28,9 @@ class Command(BaseCommand):
 
         created = 0
         for row in rows:
-            title = (
-                row.get("title")
-                or row.get("baslik")
-                or row.get("mevzuat_basligi")
-                or ""
-            )
-
-            lookup = {
-                "type": doc_type,
-                "metadata__mevzuat_tur": row.get("mevzuat_tur"),
-                "metadata__mevzuat_tertib": row.get("mevzuat_tertib"),
-                "metadata__mevzuat_no": row.get("mevzuat_no"),
-            }
-            defaults = {"title": title, "metadata": row}
-
             _, was_created = Document.objects.get_or_create(
-                defaults=defaults, **lookup
+                type=doc_type,
+                metadata=row,
             )
             if was_created:
                 created += 1

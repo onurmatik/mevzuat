@@ -35,8 +35,8 @@ HEADERS = {
 
 COOKIES = {
     ".AspNetCore.Antiforgery.Pk46jo02iDM": (
-        "CfDJ8PCQ8f3V401KkEuh7WCYGAGaRsxhQrc40y4dzrtFRjp5uAraMpR-87iyW8QxXHwgfnGf6iAUSZj7"
-        "w4hzRFR6rhn4mmEnauiitgCwmHfQChhYDJAgezsmVkYC67l8ZggRqgpiWTmQLP_eXHjkrKzsgHo"
+        "CfDJ8FB9FoTcCUdMshp2tyndiBozi7_Xtf0hjtau7ygyq_-DhRDpvHUQiPcXXQBkAx5VVhBpimF2e"
+        "_y55cWxXuPED2C_afPUtsCJKdS5MzA1P4loKX1_LF8pdLujwGSDN20Arg1MHPuOpty8zGswDU1eT_Y"
     ),
     "_ga": "GA1.1.1072477466.1753783579",
     "_ga_K30R4B6KS2": "GS2.1.s1753851984$o5$g1$t1753853382$j59$l0$h0",
@@ -59,22 +59,23 @@ COMMON_BODY = {
     "order": [],
     "search": {"value": "", "regex": False},
     "parameters": {
-        "MevzuatTur": "Teblig",
+        "MevzuatTur": "CumhurbaskanligiGenelgeleri",
         "YonetmelikMevzuatTur": "OsmanliKanunu",
         "AranacakIfade": "",
-        "AranacakYer": "2",
+        "AranacakYer": "Baslik",
         "MevzuatNo": "",
         "BaslangicTarihi": "",
         "BitisTarihi": "",
         # 👇 Antiforgery token must match the cookie value above
-        "antiforgerytoken": "CfDJ8PCQ8f3V401KkEuh7WCYGAEdjjSD7oyW-rS_t5rkpMOECFUYk4XOLWw1pWhSx_6LQsKBQ0nqc-__ROaMpAY19IfsAUTn-ZNRO0jDRXg0pwGxFeyO3IkeDHj0sU5oMdRojXINzuiDR03NS4k03EMtsiA",
+        "antiforgerytoken": "CfDJ8FB9FoTcCUdMshp2tyndiBozi7_Xtf0hjtau7ygyq_-DhRDpvHUQiPcXXQBkAx5VVhBpimF2e"
+        "_y55cWxXuPED2C_afPUtsCJKdS5MzA1P4loKX1_LF8pdLujwGSDN20Arg1MHPuOpty8zGswDU1eT_Y",
     },
 }
 
 # Choose a larger page size to cut down on round‑trips; the server currently
 # tolerates 200 just fine.  Use 10 if you prefer to mimic the UI exactly.
 PAGE_SIZE = 200
-OUTFILE = Path("mevzuat_Teblig.json")
+OUTFILE = Path(f"mevzuat_{COMMON_BODY['parameters']['MevzuatTur']}.json")
 
 def fetch_page(session: requests.Session, start: int, draw: int) -> dict:
     body = {

@@ -125,22 +125,19 @@ class DocumentAdmin(admin.ModelAdmin):
     )
     search_fields = ("metadata__mevzuat_no", "title")
     actions = (
-        "fetch_original",
-        "convert_to_markdown",
+        "fetch_document",
         "sync_with_vectorstore",
+        "convert_to_markdown",
     )
 
     def mevzuat_no(self, obj):
-        return obj.metadata.get("mevzuat_no")
+        return obj.metadata.get("mevzuatNo")
 
     def mevzuat_tertib(self, obj):
-        return obj.metadata.get("mevzuat_tertib")
+        return obj.metadata.get("mevzuatTertib")
 
     def mevzuat_tur(self, obj):
-        return obj.metadata.get("mevzuat_tur")
-
-    def resmi_gazete_tarihi(self, obj):
-        return obj.metadata.get("resmi_gazete_tarihi")
+        return obj.metadata.get("mevzuatTur")
 
     @admin.display(boolean=True, description="Has pdf?", ordering="document")
     def has_pdf(self, obj: Document) -> bool:
@@ -154,7 +151,7 @@ class DocumentAdmin(admin.ModelAdmin):
     def in_vs(self, obj: Document) -> bool:
         return bool(obj.oai_file_id)
 
-    def fetch_original(self, request, queryset):
+    def fetch_document(self, request, queryset):
         ok = 0
         errors = []
         for obj in queryset:

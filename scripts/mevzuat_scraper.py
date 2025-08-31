@@ -114,7 +114,7 @@ def fetch_first_page(mevzuat_tur: str, page_size: int, outfile: Path, extra_para
 def parse_args():
     p = argparse.ArgumentParser(description="Fetch first page from mevzuat.gov.tr datatable.")
     p.add_argument("--mevzuat-tur", default="Teblig", help="Value for parameters.MevzuatTur")
-    p.add_argument("--page-size", type=int, default=200, help="Page size to fetch")
+    p.add_argument("--page-size", type=int, default=10, help="Page size to fetch")  # 200 tested max
     p.add_argument("--outfile", type=Path, default=Path("mevzuat_firstpage.json"), help="Output JSON path")
     p.add_argument("--extra-params", type=str, default="{}", help="JSON dict merged into parameters")
     return p.parse_args()

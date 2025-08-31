@@ -17,9 +17,6 @@ class BaseDocFetcher(abc.ABC):
     def extract_metadata(self, doc) -> dict: ...
 
     @abc.abstractmethod
-    def get_last_document(self) -> "Document": ...
-
-    @abc.abstractmethod
     def fetch_and_store_document(
             self,
             doc: "Document",
@@ -163,31 +160,12 @@ def get(name: str) -> BaseDocFetcher:
 class MevzuatFetcher(BaseDocFetcher):
     mevzuat_tur = 1  # Defaults to Kanun; child classes override
 
-    def get_last_document(self):
-        """Return the document with the highest ``mevzuat_tertib`` and ``mevzuat_no`` for the ``mevzuat_tur``."""
-        from .models import Document
-        return (
-            Document.objects
-            .filter(metadata__mevzuat_tur=self.mevzuat_tur)
-            .annotate(
-                mevzuat_tertib=F("metadata__mevzuat_tertib"),
-                mevzuat_no=F("metadata__mevzuat_no"),
-            )
-            .order_by("-mevzuat_tertib", "-mevzuat_no")
-            .first()
-        )
-
     def build_document_url(self, doc):
-        uri = f"{doc.metadata['mevzuat_tur']}.{doc.metadata['mevzuat_tertib']}.{doc.metadata['mevzuat_no']}.pdf"
-        return f"https://www.mevzuat.gov.tr/MevzuatMetin/{uri}"
-
-    def build_next_document_url(self, offset=1):
-        doc = self.get_last_document()
-        uri = f"{doc.metadata['mevzuat_tur']}.{doc.metadata['mevzuat_tertib']}.{int(doc.metadata['mevzuat_no']) + offset}.pdf"
+        uri = f"{doc.metadata['mevzuatTur']}.{doc.metadata['mevzuatTertip']}.{doc.metadata['mevzuatNo']}.pdf"
         return f"https://www.mevzuat.gov.tr/MevzuatMetin/{uri}"
 
     def get_document_date(self, doc):
-        return datetime.strptime(doc.metadata['resmi_gazete_tarihi'], '%Y-%m-%d').date()
+        return datetime.strptime(doc.metadata['resmiGazeteTarihi'], '%d.%m.%Y').date()
 
     def fetch_and_store_document(self, doc, *, overwrite: bool = False, timeout: int = 30) -> "models.FileField":
         """
@@ -332,8 +310,11 @@ class CBGenelgeFetcher(MevzuatFetcher):
     }
 
     def build_document_url(self, doc):
-        uri = f"CumhurbaskanligiGenelgeleri/{doc.metadata['resmi_gazete_tarihi']}-{doc.metadata['mevzuat_no']}.pdf"
+        uri = f"CumhurbaskanligiGenelgeleri/{doc.date.strftime('%Y%m%d')}-{doc.metadata['mevzuatNo']}.pdf"
         return f"https://www.mevzuat.gov.tr/MevzuatMetin/{uri}"
+
+    def get_document_date(self, doc):
+        return datetime.strptime(doc.metadata['resmiGazeteTarihi'], '%d/%m/%Y').date()
 
 
 @register
