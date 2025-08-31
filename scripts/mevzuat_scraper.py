@@ -71,16 +71,41 @@ def build_body(parameters: dict):
     }
 
 
-def fetch_first_page(mevzuat_tur: str, page_size: int, outfile: Path, extra_params: dict | None = None):
-    session, anti_token = bootstrap_session()
-    params = {**DEFAULT_PARAMETERS, **(extra_params or {}), "MevzuatTur": mevzuat_tur, "antiforgerytoken": anti_token}
+def fetch_documents(parameters: dict, *, page_size: int = 200, timeout: int = 30) -> list[dict]:
+    """Fetch the first page of documents for the given request parameters.
+
+    Parameters
+    ----------
+    parameters:
+        The request parameters as used by the mevzuat.gov.tr datatable.
+        The ``antiforgerytoken`` will be injected automatically based on the
+        cookie retrieved from the homepage.
+    page_size:
+        Number of rows to request. Defaults to 200 which the server currently
+        accepts.
+    timeout:
+        Timeout in seconds for the HTTP requests.
+
+    Returns
+    -------
+    list of dict
+        The list of document rows returned by the endpoint.
+    """
+
+    session, anti_token = bootstrap_session(timeout=timeout)
+    params = {**parameters, "antiforgerytoken": anti_token}
     body = build_body(params)
     body.update({"draw": 1, "start": 0, "length": page_size})
 
-    resp = session.post(URL, headers=BASE_HEADERS, json=body, timeout=30)
+    resp = session.post(URL, headers=BASE_HEADERS, json=body, timeout=timeout)
     resp.raise_for_status()
     data = resp.json()
-    rows = data.get("data", [])
+    return data.get("data", [])
+
+
+def fetch_first_page(mevzuat_tur: str, page_size: int, outfile: Path, extra_params: dict | None = None):
+    params = {**DEFAULT_PARAMETERS, **(extra_params or {}), "MevzuatTur": mevzuat_tur}
+    rows = fetch_documents(params, page_size=page_size)
 
     outfile.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Fetched {len(rows)} rows and saved to {outfile.resolve()}")
