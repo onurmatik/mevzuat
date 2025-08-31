@@ -7,6 +7,7 @@ from unittest.mock import patch, PropertyMock
 from django.contrib import admin, messages
 from django.core.files.base import ContentFile
 from django.test import TestCase, override_settings, RequestFactory
+from django.core.management import call_command
 
 from .admin import DocumentAdmin, MevzuatTertibFilter
 from .models import Document, DocumentType, VectorStore
@@ -33,7 +34,7 @@ class DocumentListAPITest(TestCase):
                 "mevzuat_tur": 1,
                 "mevzuat_no": "1",
                 "mevzuat_tertib": 1,
-                "resmi_gazete_tarihi": "2020-01-01",
+                "resmiGazeteTarihi": "01.01.2020",
             },
         )
         Document.objects.create(
@@ -44,7 +45,7 @@ class DocumentListAPITest(TestCase):
                 "mevzuat_tur": 2,
                 "mevzuat_no": "2",
                 "mevzuat_tertib": 1,
-                "resmi_gazete_tarihi": "2021-01-01",
+                "resmiGazeteTarihi": "01.01.2021",
             },
         )
         Document.objects.create(
@@ -55,7 +56,7 @@ class DocumentListAPITest(TestCase):
                 "mevzuat_tur": 1,
                 "mevzuat_no": "3",
                 "mevzuat_tertib": 1,
-                "resmi_gazete_tarihi": "2021-05-05",
+                "resmiGazeteTarihi": "05.05.2021",
             },
         )
 
@@ -248,12 +249,39 @@ class DocumentAdminConfigTest(TestCase):
         self.assertIn(MevzuatTertibFilter, DocumentAdmin.list_filter)
 
 
+class FetchDocumentsCommandTest(TestCase):
+    def test_fetches_only_missing_documents_for_active_types(self):
+        active_type = DocumentType.objects.create(
+            name="Active", fetcher="MevzuatFetcher", active=True
+        )
+        inactive_type = DocumentType.objects.create(
+            name="Inactive", fetcher="MevzuatFetcher", active=False
+        )
+
+        doc_missing = Document.objects.create(
+            title="Missing", type=active_type, metadata={}
+        )
+        Document.objects.create(
+            title="Present",
+            type=active_type,
+            document=ContentFile(b"data", name="present.pdf"),
+            metadata={"resmiGazeteTarihi": "01.01.2020"},
+        )
+        Document.objects.create(
+            title="Inactive", type=inactive_type, metadata={}
+        )
+
+        with patch.object(Document, "fetch_and_store_document", autospec=True) as mock_fetch:
+            call_command("fetch_documents")
+
+        mock_fetch.assert_called_once_with(doc_missing)
+
 class DocumentAdminActionErrorTest(TestCase):
     def setUp(self):
         self.request = RequestFactory().get("/")
         self.admin = DocumentAdmin(Document, admin.site)
         self.doc = Document.objects.create(
-            title="Doc", metadata={"resmi_gazete_tarihi": "2020-01-01"}
+            title="Doc", metadata={"resmiGazeteTarihi": "01.01.2020"}
         )
 
     def _assert_error(self, action, method_name):
@@ -268,8 +296,8 @@ class DocumentAdminActionErrorTest(TestCase):
                 self.assertEqual(len(error_calls), 1)
                 self.assertIn("boom", error_calls[0].args[1])
 
-    def test_fetch_original_shows_error(self):
-        self._assert_error("fetch_original", "fetch_and_store_document")
+    def test_fetch_document_shows_error(self):
+        self._assert_error("fetch_document", "fetch_and_store_document")
 
     def test_convert_to_markdown_shows_error(self):
         self._assert_error("convert_to_markdown", "convert_pdf_to_markdown")
@@ -292,7 +320,7 @@ class DocumentSyncWithVectorStoreStorageTest(TestCase):
                 "mevzuat_tur": 1,
                 "mevzuat_tertib": 1,
                 "mevzuat_no": "1",
-                "resmi_gazete_tarihi": "2020-01-01",
+                "resmiGazeteTarihi": "01.01.2020",
             },
         )
 
