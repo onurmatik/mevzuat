@@ -95,7 +95,6 @@ class BaseDocFetcher(abc.ABC):
             "date": doc.date.strftime("%Y-%m-%d"),
             "type": doc.type.slug,
         }
-        attributes.update(doc.metadata)
 
         vector_store_id = doc.get_vectorstore_id()
 

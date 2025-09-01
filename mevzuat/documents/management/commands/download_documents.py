@@ -16,11 +16,11 @@ class Command(BaseCommand):
 
         total = queryset.count()
         if total == 0:
-            self.stdout.write(self.style.SUCCESS("No documents to fetch."))
+            self.stdout.write(self.style.SUCCESS("No documents to download."))
             return
 
         for doc in queryset.iterator():
             doc.fetch_and_store_document()
-            self.stdout.write(f"Fetched document {doc.pk}")
+            self.stdout.write(f"Downloaded document {doc.pk}")
 
-        self.stdout.write(self.style.SUCCESS(f"Fetched {total} documents."))
+        self.stdout.write(self.style.SUCCESS(f"Downloaded {total} documents."))

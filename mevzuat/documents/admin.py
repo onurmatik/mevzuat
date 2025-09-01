@@ -81,22 +81,22 @@ class MevzuatTurFilter(admin.SimpleListFilter):
         return queryset
 
 
-class MevzuatTertibFilter(admin.SimpleListFilter):
-    title = "Mevzuat tertib"
-    parameter_name = "mevzuat_tertib"
+class MevzuatTertipFilter(admin.SimpleListFilter):
+    title = "Mevzuat tertip"
+    parameter_name = "mevzuat_tertip"
 
     def lookups(self, request, model_admin):
         values = (
-            Document.objects.values_list("metadata__mevzuat_tertib", flat=True)
+            Document.objects.values_list("metadata__mevzuat_tertip", flat=True)
             .distinct()
-            .order_by("metadata__mevzuat_tertib")
+            .order_by("metadata__mevzuat_tertip")
         )
         return [(v, str(v)) for v in values if v not in (None, "")]
 
     def queryset(self, request, queryset):
         val = self.value()
         if val:
-            return queryset.filter(metadata__mevzuat_tertib=int(val))
+            return queryset.filter(metadata__mevzuat_tertip=int(val))
         return queryset
 
 
@@ -105,7 +105,7 @@ class DocumentAdmin(admin.ModelAdmin):
     list_display = (
         "title",
         "mevzuat_tur",
-        "mevzuat_tertib",
+        "mevzuat_tertip",
         "mevzuat_no",
         "type",
         "date",
@@ -118,7 +118,7 @@ class DocumentAdmin(admin.ModelAdmin):
         "type",
         "date",
         MevzuatTurFilter,
-        MevzuatTertibFilter,
+        MevzuatTertipFilter,
         HasPdfFilter,
         InVectorStoreFilter,
         HasMdFilter,
@@ -133,8 +133,8 @@ class DocumentAdmin(admin.ModelAdmin):
     def mevzuat_no(self, obj):
         return obj.metadata.get("mevzuatNo")
 
-    def mevzuat_tertib(self, obj):
-        return obj.metadata.get("mevzuatTertib")
+    def mevzuat_tertip(self, obj):
+        return obj.metadata.get("mevzuatTertip")
 
     def mevzuat_tur(self, obj):
         return obj.metadata.get("mevzuatTur")

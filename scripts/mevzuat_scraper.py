@@ -71,7 +71,7 @@ def build_body(parameters: dict):
     }
 
 
-def fetch_documents(parameters: dict, *, page_size: int = 200, timeout: int = 30) -> list[dict]:
+def fetch_documents(parameters: dict, *, page_size: int = 100, timeout: int = 30) -> list[dict]:
     """Fetch the first page of documents for the given request parameters.
 
     Parameters
@@ -81,8 +81,7 @@ def fetch_documents(parameters: dict, *, page_size: int = 200, timeout: int = 30
         The ``antiforgerytoken`` will be injected automatically based on the
         cookie retrieved from the homepage.
     page_size:
-        Number of rows to request. Defaults to 200 which the server currently
-        accepts.
+        Number of rows to request. Defaults to 100. Max the server accepts is 200.
     timeout:
         Timeout in seconds for the HTTP requests.
 
@@ -114,7 +113,7 @@ def fetch_first_page(mevzuat_tur: str, page_size: int, outfile: Path, extra_para
 def parse_args():
     p = argparse.ArgumentParser(description="Fetch first page from mevzuat.gov.tr datatable.")
     p.add_argument("--mevzuat-tur", default="Teblig", help="Value for parameters.MevzuatTur")
-    p.add_argument("--page-size", type=int, default=10, help="Page size to fetch")  # 200 tested max
+    p.add_argument("--page-size", type=int, default=100, help="Page size to fetch")  # 200 tested max
     p.add_argument("--outfile", type=Path, default=Path("mevzuat_firstpage.json"), help="Output JSON path")
     p.add_argument("--extra-params", type=str, default="{}", help="JSON dict merged into parameters")
     return p.parse_args()
