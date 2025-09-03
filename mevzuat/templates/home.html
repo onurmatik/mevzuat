@@ -30,6 +30,35 @@
 
 <div class="row">
   <div class="col-12">
+    <h2 class="fs-4">Recently Added Documents</h2>
+    <ul class="list-group">
+      {% for doc in recent_documents %}
+        <li class="list-group-item">
+          <strong>
+            {% if doc.original_document_url %}
+              <a href="{{ doc.original_document_url }}" target="_blank">{{ doc.title }}</a>
+            {% else %}
+              {{ doc.title }}
+            {% endif %}
+          </strong><br>
+          <small class="text-muted">
+            {% if doc.date %}{{ doc.date }}{% endif %}
+            {% if doc.type %}
+              {% if doc.date %} | {% endif %}{{ doc.type.name }}
+            {% endif %}
+          </small>
+        </li>
+      {% empty %}
+        <li class="list-group-item">No documents available.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+<hr class="my-5">
+
+<div class="row">
+  <div class="col-12">
     <h2 class="fs-4">API Access</h2>
     <p>You can access our data programmatically through the available API endpoints. Full interactive documentation is available at <a href="/api/docs">/api/docs</a>.</p>
     <ul>
