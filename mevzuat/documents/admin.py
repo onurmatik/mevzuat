@@ -46,6 +46,58 @@ class HasMdFilter(admin.SimpleListFilter):
         return queryset
 
 
+class FileSizeFilter(admin.SimpleListFilter):
+    title = "File size"
+    parameter_name = "file_size_bucket"
+
+    ONE_MB = 1024 * 1024
+
+    def lookups(self, request, model_admin):
+        return (
+            ("lt1", "< 1MB"),
+            ("1to5", "1–5MB"),
+            ("5to10", "5–10MB"),
+            ("10to20", "10–20MB"),
+            ("gt20", "> 20MB"),
+            ("unknown", "Unknown / unset"),
+        )
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        if val == "lt1":
+            return queryset.filter(file_size__lt=self.ONE_MB)
+        if val == "1to5":
+            return queryset.filter(file_size__gte=self.ONE_MB, file_size__lt=5 * self.ONE_MB)
+        if val == "5to10":
+            return queryset.filter(file_size__gte=5 * self.ONE_MB, file_size__lt=10 * self.ONE_MB)
+        if val == "10to20":
+            return queryset.filter(file_size__gte=10 * self.ONE_MB, file_size__lt=20 * self.ONE_MB)
+        if val == "gt20":
+            return queryset.filter(file_size__gte=20 * self.ONE_MB)
+        if val == "unknown":
+            return queryset.filter(file_size__isnull=True)
+        return queryset
+
+
+class MarkdownStatusFilter(admin.SimpleListFilter):
+    title = "Markdown status"
+    parameter_name = "markdown_status"
+
+    def lookups(self, request, model_admin):
+        choices = getattr(Document, "MARKDOWN_STATUS_CHOICES", ())
+        return list(choices) + [("unset", "Unset")]
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        if val == "unset":
+            return queryset.filter(Q(markdown_status="") | Q(markdown_status__isnull=True))
+        if val == "null":
+            return queryset.filter(markdown_status__isnull=True)
+        if val:
+            return queryset.filter(markdown_status=val)
+        return queryset
+
+
 class InVectorStoreFilter(admin.SimpleListFilter):
     title = "In vector store?"
     parameter_name = "in_vs"
@@ -108,11 +160,13 @@ class DocumentAdmin(admin.ModelAdmin):
         "mevzuat_tertip",
         "mevzuat_no",
         "type",
+        "file_size",
         "date",
         "created_at",
         "has_pdf",
         "in_vs",
         "has_md",
+        "markdown_status",
     )
     list_filter = (
         "type",
@@ -122,12 +176,17 @@ class DocumentAdmin(admin.ModelAdmin):
         HasPdfFilter,
         InVectorStoreFilter,
         HasMdFilter,
+        FileSizeFilter,
+        MarkdownStatusFilter,
     )
-    search_fields = ("metadata__mevzuat_no", "title")
+    search_fields = ("uuid", "metadata__mevzuat_no", "title")
     actions = (
         "fetch_document",
         "sync_with_vectorstore",
         "convert_to_markdown",
+        "convert_to_markdown_force_ocr",
+        "check_markdown_health",
+        "set_file_sizes",
     )
 
     def mevzuat_no(self, obj):
@@ -174,25 +233,123 @@ class DocumentAdmin(admin.ModelAdmin):
                 level=messages.ERROR,
             )
 
-    def convert_to_markdown(self, request, queryset):
+    def _convert_documents_to_markdown(
+            self,
+            request,
+            queryset,
+            *,
+            overwrite: bool,
+            force_ocr: bool,
+            success_text: str,
+    ):
         ok = 0
         errors = []
         for obj in queryset:
             try:
-                obj.convert_pdf_to_markdown(overwrite=False)
+                obj.convert_pdf_to_markdown(overwrite=overwrite, force_ocr=force_ocr)
                 ok += 1
             except Exception as exc:  # pragma: no cover - defensive
+                failure_status = getattr(obj, "MARKDOWN_STATUS_FAILED", "failed")
+                obj.markdown_status = failure_status
+                obj.save(update_fields=["markdown_status"])
                 errors.append((obj, exc))
         if ok:
             self.message_user(
                 request,
-                f"Successfully converted {ok} document(s).",
+                success_text.format(count=ok),
                 level=messages.SUCCESS,
             )
         for obj, exc in errors:
             self.message_user(
                 request,
                 f"{obj.title} could not be converted: {exc}",
+                level=messages.ERROR,
+            )
+
+    def convert_to_markdown(self, request, queryset):
+        self._convert_documents_to_markdown(
+            request,
+            queryset,
+            overwrite=False,
+            force_ocr=False,
+            success_text="Successfully converted {count} document(s).",
+        )
+
+    def convert_to_markdown_force_ocr(self, request, queryset):
+        self._convert_documents_to_markdown(
+            request,
+            queryset,
+            overwrite=True,
+            force_ocr=True,
+            success_text="Successfully re-converted {count} document(s) with OCR.",
+        )
+
+    def check_markdown_health(self, request, queryset):
+        flagged = 0
+        skipped = 0
+        warning = getattr(Document, "MARKDOWN_STATUS_WARNING", "warning")
+        for obj in queryset:
+            if not obj.markdown:
+                skipped += 1
+                continue
+            if obj.has_markdown_glyph_artifacts():
+                if obj.markdown_status != warning:
+                    obj.markdown_status = warning
+                    obj.save(update_fields=["markdown_status"])
+                flagged += 1
+        if flagged:
+            self.message_user(
+                request,
+                f"Marked {flagged} document(s) for markdown review due to glyph artifacts.",
+                level=messages.WARNING,
+            )
+        if skipped:
+            self.message_user(
+                request,
+                f"Skipped {skipped} document(s) because no markdown is stored.",
+                level=messages.INFO,
+            )
+        if not flagged and not skipped:
+            self.message_user(
+                request,
+                "Checked documents and found no glyph artifacts in markdown.",
+                level=messages.SUCCESS,
+            )
+
+    def set_file_sizes(self, request, queryset):
+        """Populate missing file_size for selected documents."""
+        updated = 0
+        missing = 0
+        errors = []
+        for obj in queryset:
+            if not obj.document:
+                missing += 1
+                continue
+            if obj.file_size:
+                continue
+            try:
+                obj.file_size = obj.document.size
+                obj.save(update_fields=["file_size"])
+                updated += 1
+            except Exception as exc:  # pragma: no cover - defensive
+                errors.append((obj, exc))
+
+        if updated:
+            self.message_user(
+                request,
+                f"Updated file size for {updated} document(s).",
+                level=messages.SUCCESS,
+            )
+        if missing:
+            self.message_user(
+                request,
+                f"{missing} document(s) skipped because no PDF is stored.",
+                level=messages.WARNING,
+            )
+        for obj, exc in errors:
+            self.message_user(
+                request,
+                f"{obj.title} could not update size: {exc}",
                 level=messages.ERROR,
             )
 

@@ -1,6 +1,7 @@
 import abc
 import os
-from typing import Type
+import tempfile
+from typing import Optional, Type
 from datetime import datetime
 import requests
 from django.core.files.base import ContentFile
@@ -25,18 +26,27 @@ class BaseDocFetcher(abc.ABC):
             timeout: int = 30
     ) -> models.FileField: ...
 
-    def convert_pdf_to_markdown(self, doc: "Document", *, overwrite: bool = False) -> "models.FileField":
+    def convert_pdf_to_markdown(
+            self,
+            doc: "Document",
+            *,
+            overwrite: bool = False,
+            force_ocr: bool = False,
+    ) -> str:
         """Convert the stored PDF into Markdown and persist it.
 
         Parameters
         ----------
         overwrite : bool, default False
             If ``False`` and ``self.markdown`` already exists, do nothing.
+        force_ocr : bool, default False
+            If ``True`` the conversion pipeline runs OCR on every page even when
+            embedded text exists. Useful when PDFs have poor text layers.
 
         Returns
         -------
-        django.db.models.fields.files.FieldFile
-            The stored ``markdown`` field.
+        str
+            The stored ``markdown`` text.
 
         Raises
         ------
@@ -46,21 +56,65 @@ class BaseDocFetcher(abc.ABC):
 
         from docling.document_converter import DocumentConverter
 
+        success_status = getattr(doc, "MARKDOWN_STATUS_SUCCESS", "success")
         if doc.markdown and not overwrite:
+            if not doc.markdown_status:
+                doc.markdown_status = success_status
+                doc.save(update_fields=["markdown_status"])
             return doc.markdown
 
         if not doc.document:
             raise ValueError("No document available to convert")
 
-        converter = DocumentConverter()
-        result = converter.convert(doc.document.path)
-        markdown_text = result.document.export_to_markdown()
+        converter_kwargs = {}
+        if force_ocr:
+            from docling.datamodel.base_models import InputFormat
+            from docling.document_converter import PdfFormatOption
+            from docling.datamodel.pipeline_options import OcrAutoOptions
+            from docling.pipeline.standard_pdf_pipeline import ThreadedPdfPipelineOptions
 
-        filename = f"{doc.uuid}.md"
+            pipeline_options = ThreadedPdfPipelineOptions(
+                ocr_options=OcrAutoOptions(
+                    force_full_page_ocr=True,
+                    lang=["tur"],
+                )
+            )
+            converter_kwargs["format_options"] = {
+                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+            }
+
+        converter = DocumentConverter(**converter_kwargs)
+        doc.document.open("rb")
+        try:
+            pdf_bytes = doc.document.read()
+        finally:
+            doc.document.close()
+
+        file_size_updated = False
+        if getattr(doc, "file_size", None) is None:
+            doc.file_size = len(pdf_bytes)
+            file_size_updated = True
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            tmp.write(pdf_bytes)
+            tmp_path = tmp.name
+
+        result = None
+        try:
+            result = converter.convert(tmp_path)
+            markdown_text = result.document.export_to_markdown()
+        finally:
+            # Ensure temp file is removed and PDF resources are freed even if conversion fails
+            os.remove(tmp_path)
+            self._cleanup_conversion(result)
 
         with transaction.atomic():
-            doc.markdown.save(filename, ContentFile(markdown_text), save=False)
-            doc.save(update_fields=["markdown"])
+            doc.markdown = markdown_text
+            doc.markdown_status = success_status
+            fields = ["markdown", "markdown_status"]
+            if file_size_updated:
+                fields.append("file_size")
+            doc.save(update_fields=fields)
 
         return doc.markdown
 
@@ -115,12 +169,20 @@ class BaseDocFetcher(abc.ABC):
         finally:
             doc.document.close()
 
+        file_size_updated = False
+        if getattr(doc, "file_size", None) is None:
+            doc.file_size = len(file_tuple[1])
+            file_size_updated = True
+
         uploaded_file = client.files.create(
             file=file_tuple, purpose="user_data"
         )
 
         doc.oai_file_id = uploaded_file.id
-        doc.save(update_fields=["oai_file_id"])
+        fields = ["oai_file_id"]
+        if file_size_updated:
+            fields.append("file_size")
+        doc.save(update_fields=fields)
 
         # Attach the uploaded file to the vector store
         client.vector_stores.files.create(
@@ -130,6 +192,31 @@ class BaseDocFetcher(abc.ABC):
         )
 
         return uploaded_file.id
+
+    def _cleanup_conversion(self, result: Optional[object]) -> None:
+        """Release docling/pypdfium resources eagerly to avoid shutdown warnings."""
+        if result is None:
+            return
+
+        for page in getattr(result, "pages", []) or []:
+            backend = getattr(page, "_backend", None)
+            if backend is not None:
+                try:
+                    backend.unload()
+                except Exception:
+                    pass
+                else:
+                    page._backend = None
+
+        input_obj = getattr(result, "input", None)
+        input_backend = getattr(input_obj, "_backend", None)
+        if input_backend is not None and getattr(input_backend, "_pdoc", None):
+            try:
+                input_backend.unload()
+            except Exception:
+                pass
+            else:
+                input_obj._backend = None
 
 
 _registry: dict[str, BaseDocFetcher] = {}
@@ -213,11 +300,13 @@ class MevzuatFetcher(BaseDocFetcher):
         response.raise_for_status()  # will raise if status ≥ 400
 
         filename = f"{doc.uuid}.pdf"
+        file_size = len(response.content)
 
         # Save inside a transaction so the DB row and the file write stay in sync
         with transaction.atomic():
             doc.document.save(filename, ContentFile(response.content), save=False)
-            doc.save(update_fields=["document"])
+            doc.file_size = file_size
+            doc.save(update_fields=["document", "file_size"])
 
         return doc.document
 

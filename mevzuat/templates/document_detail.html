@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}{{ document.title }} | Mevzuat{% endblock %}
+
+{% block extra_css %}
+<style>
+  .markdown-body {
+    white-space: pre-wrap;
+    background-color: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: .5rem;
+    padding: 1.5rem;
+    line-height: 1.6;
+  }
+  .markdown-body h1,
+  .markdown-body h2,
+  .markdown-body h3 {
+    margin-top: 1.25rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="{% url 'home' %}" class="text-decoration-none">
+    <i class="bi bi-arrow-left"></i> Back to home
+  </a>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <h1 class="h3 mb-1">{{ document.title }}</h1>
+    <p class="text-muted">
+      {% if document.date %}{{ document.date }}{% endif %}
+      {% if document.type %}
+        {% if document.date %}&nbsp;•&nbsp;{% endif %}{{ document.type.name }}
+      {% endif %}
+    </p>
+    {% if document.original_document_url %}
+      <p>
+        <a class="btn btn-outline-primary" href="{{ document.original_document_url }}" target="_blank" rel="noopener">
+          View original document<i class="bi bi-box-arrow-up-right ms-2"></i>
+        </a>
+      </p>
+    {% endif %}
+
+    <section class="markdown-body">
+      {% if document.markdown %}
+        {{ document.markdown|linebreaksbr }}
+      {% else %}
+        <p class="text-muted mb-0">No markdown content is available for this document yet.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h5">Document details</h2>
+        <dl class="row mb-0 small">
+          <dt class="col-4">UUID</dt>
+          <dd class="col-8 text-break"><code class="small">{{ document.uuid }}</code></dd>
+          <dt class="col-4">Date</dt>
+          <dd class="col-8">{{ document.date|default:"—" }}</dd>
+          <dt class="col-4">Type</dt>
+          <dd class="col-8">
+            {% if document.type %}
+              {{ document.type.name }}
+            {% else %}
+              —
+            {% endif %}
+          </dd>
+          <dt class="col-4">Created</dt>
+          <dd class="col-8">{{ document.created_at|date:"Y-m-d H:i" }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

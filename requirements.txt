@@ -11,5 +11,4 @@ django-storages
 mcp
 fastmcp
 gunicorn
-# For pdf => md
-# docling
+docling

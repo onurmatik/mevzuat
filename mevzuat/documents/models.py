@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 import uuid
 from functools import cached_property
 from django.core.exceptions import ValidationError
@@ -69,6 +70,17 @@ def parse_date(effective_date: str):
 
 
 class Document(models.Model):
+    MARKDOWN_STATUS_SUCCESS = "success"
+    MARKDOWN_STATUS_WARNING = "warning"
+    MARKDOWN_STATUS_FAILED = "failed"
+    MARKDOWN_STATUS_CHOICES = (
+        (MARKDOWN_STATUS_SUCCESS, "Success"),
+        (MARKDOWN_STATUS_WARNING, "Warning"),
+        (MARKDOWN_STATUS_FAILED, "Failed"),
+    )
+    GLYPH_ARTIFACT_PATTERN = re.compile(r"GLYPH(?:<|&lt;)", re.IGNORECASE)
+    GLYPH_ARTIFACT_THRESHOLD = 5
+
     uuid = models.UUIDField(default=uuid.uuid4, editable=False)
     type = models.ForeignKey(DocumentType, on_delete=models.SET_NULL, null=True, blank=True, related_name='documents')
 
@@ -76,7 +88,9 @@ class Document(models.Model):
     date = models.DateField(blank=True, null=True)  # The significant date for the doc; e.g.: effective date, pub date, etc.
 
     document = models.FileField(upload_to=document_upload_to, blank=True, null=True)
-    markdown = models.FileField(upload_to=document_upload_to, blank=True, null=True)
+    file_size = models.BigIntegerField(blank=True, null=True)
+    markdown = models.TextField(blank=True, null=True)
+    markdown_status = models.CharField(max_length=20, choices=MARKDOWN_STATUS_CHOICES, blank=True, null=True)
 
     oai_file_id = models.CharField(max_length=100, blank=True, null=True)
     embedding = VectorField(dimensions=1536, blank=True, null=True)
@@ -133,9 +147,35 @@ class Document(models.Model):
     def fetch_and_store_document(self, overwrite=False):
         return self._fetcher().fetch_and_store_document(self, overwrite=overwrite)
 
-    def convert_pdf_to_markdown(self, overwrite=False):
-        return self._fetcher().convert_pdf_to_markdown(self, overwrite=overwrite)
+    def convert_pdf_to_markdown(self, overwrite=False, *, force_ocr=False):
+        markdown = self._fetcher().convert_pdf_to_markdown(
+            self,
+            overwrite=overwrite,
+            force_ocr=force_ocr,
+        )
+
+        if self.has_markdown_glyph_artifacts():
+            warning_status = getattr(self, "MARKDOWN_STATUS_WARNING", "warning")
+            if force_ocr:
+                if self.markdown_status != warning_status:
+                    self.markdown_status = warning_status
+                    self.save(update_fields=["markdown_status"])
+                return self.markdown
+            return self.convert_pdf_to_markdown(
+                overwrite=True,
+                force_ocr=True,
+            )
+
+        return markdown
 
     def sync_with_vectorstore(self):
         """Synchronise this document with the configured vector store."""
         return self._fetcher().sync_with_vectorstore(self)
+
+    def has_markdown_glyph_artifacts(self, *, threshold=None):
+        """Return True if markdown resembles direct glyph dumps from PDFs."""
+        if not self.markdown:
+            return False
+        threshold = threshold or self.GLYPH_ARTIFACT_THRESHOLD
+        matches = self.GLYPH_ARTIFACT_PATTERN.findall(self.markdown)
+        return len(matches) >= threshold

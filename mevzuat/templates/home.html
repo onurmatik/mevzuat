@@ -11,36 +11,21 @@
 
 {% block content %}
 
-<div class="row">
+<div class="row g-4">
   <div class="col-lg-8">
-    <canvas id="documentsChart" height="150"></canvas>
-  </div>
-  <div class="col-lg-4 d-flex flex-column h-100">
-    <div id="chartLegend" class="small mb-3"></div>
-    <div id="rangeButtons" class="btn-group w-100" role="group">
-      <button type="button" class="btn btn-outline-secondary flex-fill active" data-range="30days">30 Days</button>
-      <button type="button" class="btn btn-outline-secondary flex-fill" data-range="thisYear">This Year</button>
-      <button type="button" class="btn btn-outline-secondary flex-fill" data-range="lastYear">Last Year</button>
-      <button type="button" class="btn btn-outline-secondary flex-fill" data-range="all">All</button>
-    </div>
-  </div>
-</div>
-
-<hr class="my-5">
-
-<div class="row">
-  <div class="col-12">
     <h2 class="fs-4">Recently Added Documents</h2>
     <ul class="list-group">
       {% for doc in recent_documents %}
         <li class="list-group-item">
           <strong>
-            {% if doc.original_document_url %}
-              <a href="{{ doc.original_document_url }}" target="_blank">{{ doc.title }}</a>
-            {% else %}
-              {{ doc.title }}
-            {% endif %}
-          </strong><br>
+            <a href="{% url 'document_detail' doc.uuid %}" class="text-decoration-none">{{ doc.title }}</a>
+          </strong>
+          {% if doc.original_document_url %}
+            <a href="{{ doc.original_document_url }}" target="_blank" rel="noopener" class="small ms-2 text-decoration-none">
+              Original document <i class="bi bi-box-arrow-up-right"></i>
+            </a>
+          {% endif %}
+          <br>
           <small class="text-muted">
             {% if doc.date %}{{ doc.date }}{% endif %}
             {% if doc.type %}
@@ -53,52 +38,52 @@
       {% endfor %}
     </ul>
   </div>
-</div>
-
-<hr class="my-5">
-
-<div class="row">
-  <div class="col-12">
-    <h2 class="fs-4">API Access</h2>
-    <p>You can access our data programmatically through the available API endpoints. Full interactive documentation is available at <a href="/api/docs">/api/docs</a>.</p>
-    <ul>
-      <li><code>GET /api/documents/types</code> — List all available document types.</li>
-      <li><code>GET /api/documents/counts</code> — Get counts of documents by type over a time interval.</li>
-      <li><code>GET /api/documents/list</code> — List documents with filters such as type, year, month, or date range.</li>
-      <li><code>GET /api/documents/search</code> — Search documents with optional filters like type and date range.</li>
-    </ul>
-  </div>
-</div>
-
-<hr class="my-5">
-
-<div class="row">
-  <div class="col-12">
-    <h2 class="fs-4">MCP Access</h2>
-    <p>The same functionality is also available through <strong>Model Context Protocol (MCP)</strong> tools. This allows you to integrate document data directly into AI-powered workflows.</p>
-    <p>The MCP server is available at: <code>https://mevzuat.info/mcp/</code></p>
-    <ul>
-      <li><code>types</code> — List all available document types.</li>
-      <li><code>counts</code> — Get counts of documents by type over a time interval.</li>
-      <li><code>list</code> — List documents with filters such as type, year, month, or date range.</li>
-      <li><code>search</code> — Search documents with optional filters like type and date range.</li>
-    </ul>
-    <p>Refer to the <a href="/api/docs">API documentation</a> for detailed parameter descriptions, which also apply when using these tools via MCP.</p>
-  </div>
-</div>
-
-<hr class="my-5">
-<div class="row">
-  <div class="col-12">
-    <h2 class="fs-4">Source repository</h2>
-    <p>
-      You can find the source code and contribute via our
-      <a href="https://github.com/onurmatik/mevzuat/" target="_blank">
-        <i class="bi bi-github"></i> GitHub repository
-      </a>.
-    </p>
-    <p>Although its primary focus is on Turkish legislation, it is built as a flexible Django project that can be adapted to similar document intelligence needs in other contexts.</p>
-    <p>We invite you to use it, experiment with it, and contribute.</p>
+  <div class="col-lg-4">
+    <div class="d-flex flex-column h-100">
+      <div id="chartLegend" class="small mb-3"></div>
+      <div id="rangeButtons" class="btn-group w-100 mb-3" role="group">
+        <button type="button" class="btn btn-outline-secondary flex-fill active" data-range="30days">30 Days</button>
+        <button type="button" class="btn btn-outline-secondary flex-fill" data-range="thisYear">This Year</button>
+        <button type="button" class="btn btn-outline-secondary flex-fill" data-range="lastYear">Last Year</button>
+        <button type="button" class="btn btn-outline-secondary flex-fill" data-range="all">All</button>
+      </div>
+      <canvas id="documentsChart" height="150" class="w-100 mb-4"></canvas>
+      <div>
+        <h2 class="fs-4">API Access</h2>
+        <p>You can access our data programmatically through the available API endpoints. Full interactive documentation is available at <a href="/api/docs">/api/docs</a>.</p>
+        <ul>
+          <li><code>GET /api/documents/types</code> — List all available document types.</li>
+          <li><code>GET /api/documents/counts</code> — Get counts of documents by type over a time interval.</li>
+          <li><code>GET /api/documents/list</code> — List documents with filters such as type, year, month, or date range.</li>
+          <li><code>GET /api/documents/search</code> — Search documents with optional filters like type and date range.</li>
+        </ul>
+      </div>
+      <hr class="my-4">
+      <div>
+        <h2 class="fs-4">MCP Access</h2>
+        <p>The same functionality is also available through <strong>Model Context Protocol (MCP)</strong> tools. This allows you to integrate document data directly into AI-powered workflows.</p>
+        <p>The MCP server is available at: <code>https://mevzuat.info/mcp/</code></p>
+        <ul>
+          <li><code>types</code> — List all available document types.</li>
+          <li><code>counts</code> — Get counts of documents by type over a time interval.</li>
+          <li><code>list</code> — List documents with filters such as type, year, month, or date range.</li>
+          <li><code>search</code> — Search documents with optional filters like type and date range.</li>
+        </ul>
+        <p>Refer to the <a href="/api/docs">API documentation</a> for detailed parameter descriptions, which also apply when using these tools via MCP.</p>
+      </div>
+      <hr class="my-4">
+      <div>
+        <h2 class="fs-4">Source repository</h2>
+        <p>
+          You can find the source code and contribute via our
+          <a href="https://github.com/onurmatik/mevzuat/" target="_blank">
+            <i class="bi bi-github"></i> GitHub repository
+          </a>.
+        </p>
+        <p>Although its primary focus is on Turkish legislation, it is built as a flexible Django project that can be adapted to similar document intelligence needs in other contexts.</p>
+        <p>We invite you to use it, experiment with it, and contribute.</p>
+      </div>
+    </div>
   </div>
 </div>
 
