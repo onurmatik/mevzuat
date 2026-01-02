@@ -9,7 +9,7 @@ from django.core.files.base import ContentFile
 from django.test import TestCase, override_settings, RequestFactory
 from django.core.management import call_command
 
-from .admin import DocumentAdmin, MevzuatTertipFilter
+from .admin import DocumentAdmin, MevzuatTertipFilter, HasEmbeddingFilter
 from .models import Document, DocumentType
 
 
@@ -136,6 +136,8 @@ class DocumentAdminConfigTest(TestCase):
     def test_mevzuat_tertib_in_admin_lists(self):
         self.assertIn("mevzuat_tertip", DocumentAdmin.list_display)
         self.assertIn(MevzuatTertipFilter, DocumentAdmin.list_filter)
+        self.assertIn("has_embedding", DocumentAdmin.list_display)
+        self.assertIn(HasEmbeddingFilter, DocumentAdmin.list_filter)
 
 
 class FetchDocumentsCommandTest(TestCase):

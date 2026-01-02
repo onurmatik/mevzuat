@@ -41,6 +41,22 @@ class HasMdFilter(admin.SimpleListFilter):
         return queryset
 
 
+class HasEmbeddingFilter(admin.SimpleListFilter):
+    title = "Has embedding?"
+    parameter_name = "has_embedding"
+
+    def lookups(self, request, model_admin):
+        return (("yes", "Yes"), ("no", "No"))
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        if val == "yes":
+            return queryset.exclude(embedding__isnull=True)
+        if val == "no":
+            return queryset.filter(embedding__isnull=True)
+        return queryset
+
+
 class FileSizeFilter(admin.SimpleListFilter):
     title = "File size"
     parameter_name = "file_size_bucket"
@@ -145,6 +161,7 @@ class DocumentAdmin(admin.ModelAdmin):
         "has_pdf",
         "in_vs",
         "has_md",
+        "has_embedding",
         "markdown_status",
     )
     list_filter = (
@@ -154,6 +171,7 @@ class DocumentAdmin(admin.ModelAdmin):
         MevzuatTertipFilter,
         HasPdfFilter,
         HasMdFilter,
+        HasEmbeddingFilter,
         FileSizeFilter,
         MarkdownStatusFilter,
     )
@@ -185,6 +203,10 @@ class DocumentAdmin(admin.ModelAdmin):
     @admin.display(boolean=True, description="Has md?")
     def has_md(self, obj: Document) -> bool:
         return bool(obj.markdown)
+
+    @admin.display(boolean=True, description="Has embedding?")
+    def has_embedding(self, obj: Document) -> bool:
+        return obj.embedding is not None
 
     @admin.display(boolean=True, description="In VS?")
     def in_vs(self, obj: Document) -> bool:
