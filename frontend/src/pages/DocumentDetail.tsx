@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Markdown from 'react-markdown';
-import { ArrowLeft, Share2, Printer, Download, Clock, Hash, FileText, ArrowUpRight, BookOpen, Scale, Sparkles } from 'lucide-react'; // Added Sparkles
+import { ArrowLeft, Share2, Printer, Download, Clock, Hash, FileText, ArrowUpRight, BookOpen, Scale } from 'lucide-react';
 import { DOC_TYPE_LABELS } from '../data/mock'; // Keep labels for now, or fetch from API types? Labes are translation maps. api returns strings.
 // Actually api returns slug. We need to map slug to label. DOC_TYPE_LABELS has keys like 'law', 'khk'.
 // I should probably move DOC_TYPE_LABELS to a shared config or fetch types from API.
@@ -15,7 +15,6 @@ export default function DocumentDetail() {
   const [doc, setDoc] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
   const [relatedDocs, setRelatedDocs] = useState<Document[]>([]);
-  const [generatingSummary, setGeneratingSummary] = useState(false);
 
   const { t, language } = useLanguage();
 
@@ -43,18 +42,7 @@ export default function DocumentDetail() {
     load();
   }, [id]);
 
-  const handleSummarize = async () => {
-    if (!doc || !doc.id) return;
-    setGeneratingSummary(true);
-    try {
-      const res = await api.summarizeDocument(doc.id);
-      setDoc(prev => prev ? ({ ...prev, summary: res.summary }) : null);
-    } catch (e) {
-      console.error("Summarize failed", e);
-    } finally {
-      setGeneratingSummary(false);
-    }
-  };
+
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center bg-background">Loading...</div>;
@@ -131,17 +119,7 @@ export default function DocumentDetail() {
                     {doc.summary}
                   </p>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-4 text-center">
-                    <p className="text-sm text-muted-foreground mb-3">No summary available.</p>
-                    <button
-                      onClick={handleSummarize}
-                      disabled={generatingSummary}
-                      className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-md hover:bg-primary/20 transition-colors disabled:opacity-50"
-                    >
-                      <Sparkles size={16} />
-                      {generatingSummary ? "Generating..." : "Generate Summary with AI"}
-                    </button>
-                  </div>
+                  <p className="text-sm text-muted-foreground italic">No summary available.</p>
                 )}
               </div>
             </div>

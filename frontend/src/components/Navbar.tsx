@@ -15,7 +15,6 @@ export function Navbar() {
   const navLinks = [
     { name: t('nav.home'), path: '/' },
     { name: t('nav.search'), path: '/search' },
-    { name: t('nav.pricing'), path: '/pricing' },
     { name: t('nav.api'), path: '/api-docs' },
   ];
 
@@ -36,7 +35,7 @@ export function Navbar() {
               </div>
               <span className="font-semibold text-lg tracking-tight text-foreground">Mevzuat.info</span>
             </Link>
-            
+
             <div className="hidden md:flex items-center space-x-1">
               {navLinks.map((link) => (
                 <Link
@@ -56,7 +55,7 @@ export function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center gap-4">
-            <button 
+            <button
               onClick={toggleLang}
               className="text-sm font-medium text-muted-foreground hover:text-foreground flex items-center gap-1.5 px-2 py-1 rounded hover:bg-secondary/50 transition-colors"
             >
@@ -68,22 +67,22 @@ export function Navbar() {
 
             {isAuthenticated ? (
               <div className="flex items-center gap-3">
-                 <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                      <UserIcon size={16} />
-                    </div>
-                    <span className="hidden lg:inline-block">{user?.email?.split('@')[0]}</span>
-                 </div>
-                 <button 
-                   onClick={logout}
-                   className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full transition-colors"
-                   title="Logout"
-                 >
-                   <LogOut size={18} />
-                 </button>
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                    <UserIcon size={16} />
+                  </div>
+                  <span className="hidden lg:inline-block">{user?.email?.split('@')[0]}</span>
+                </div>
+                <button
+                  onClick={logout}
+                  className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full transition-colors"
+                  title="Logout"
+                >
+                  <LogOut size={18} />
+                </button>
               </div>
             ) : (
-              <button 
+              <button
                 onClick={openAuthModal}
                 className="text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md transition-colors shadow-sm"
               >
@@ -91,7 +90,7 @@ export function Navbar() {
               </button>
             )}
           </div>
-          
+
           <div className="flex md:hidden items-center gap-4">
             <button
               onClick={() => setIsOpen(!isOpen)}
@@ -129,22 +128,22 @@ export function Navbar() {
                 </Link>
               ))}
               <div className="pt-4 border-t border-border mt-4 flex items-center justify-between">
-                 <button 
+                <button
                   onClick={toggleLang}
                   className="text-sm font-medium text-muted-foreground flex items-center gap-2"
                 >
                   <Globe size={16} /> {language.toUpperCase()}
                 </button>
-                
+
                 {isAuthenticated ? (
-                  <button 
+                  <button
                     onClick={() => { logout(); setIsOpen(false); }}
                     className="text-sm font-medium text-destructive hover:bg-destructive/10 px-4 py-2 rounded-md flex items-center gap-2"
                   >
                     <LogOut size={16} /> Logout
                   </button>
                 ) : (
-                  <button 
+                  <button
                     onClick={() => { openAuthModal(); setIsOpen(false); }}
                     className="text-sm font-medium bg-primary text-primary-foreground px-4 py-2 rounded-md"
                   >
