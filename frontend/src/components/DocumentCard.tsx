@@ -16,7 +16,7 @@ export function DocumentCard({ doc }: DocumentCardProps) {
   const typeLabel = (DOC_TYPE_LABELS as any)[typeKey]?.[language] || doc.type;
 
   return (
-    <Link to={`/document/${doc.id}`} className="block group h-full">
+    <Link to={`/document/${doc.uuid}`} className="block group h-full">
       <article className="bg-card h-full rounded-lg border border-border p-5 hover:border-ring/50 hover:shadow-sm transition-all duration-200 flex flex-col">
         <div className="flex justify-between items-start mb-4">
           <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-gray-500/10">

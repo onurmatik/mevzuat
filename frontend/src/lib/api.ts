@@ -3,6 +3,7 @@ import { MOCK_DOCUMENTS } from '../data/mock';
 // Types derived from Backend DocumentOut schema
 export interface Document {
   id: number;
+  uuid: string;
   title: string;
   type: string; // slug
   date: string | null;
@@ -65,36 +66,12 @@ export const api = {
     return fetchApi<Document[]>(`/documents/list?${searchParams.toString()}`);
   },
 
-  async getDocument(id: string | number): Promise<Document> {
-    // Determine if id is UUID or int. 
-    // The backend `document_detail` view uses UUID in URL, but `DocumentOut` has int ID.
-    // Wait, the backend view `document_detail` is a Django view returning HTML, not JSON API.
-    // The API `list_documents` returns `DocumentOut` which has integer `id`.
-    // But we don't have a single document API endpoint in `api.py`.
-    // We should probably rely on `list_documents` with filter or add a detail endpoint.
-    // Checking `urls.py`: `path("documents/<uuid:document_uuid>/", documents_views.document_detail)` is HTML.
-    // The task plan didn't explicitly ask for a JSON detail endpoint, but we need one for the React app if we are not using the django view.
-    // However, the React app seems to be a single page app.
-    // Let's assume we need to add a detail endpoint or use the list endpoint.
-    // Actually, `list_documents` returns `list[DocumentOut]`.
-    // Let's check `api.py` again.
-    // There is no single document retrieval endpoint in `api.py`.
-    // I should add one.
-    // For now, I'll filter by ID using list if possible, but `list_documents` doesn't filter by ID.
-    // I will add `retrieve_document` to `api.py`.
-
-    // TEMPORARY: using list and filtering client side or mock fall back?
-    // No, I should implement the backend endpoint.
-    // I'll proceed with writing this client assuming the endpoint exists (documents/{id})
-    // Note: The React route uses `id`, which might be int or uuid. `DocumentOut` uses int `id`.
-    // The backend `Document` model has `uuid` and `id`.
-    // I'll assume we'll use integer ID for API consistency.
-
-    return fetchApi<Document>(`/documents/${id}`);
+  async getDocument(uuid: string): Promise<Document> {
+    return fetchApi<Document>(`/documents/${uuid}`);
   },
 
-  async summarizeDocument(id: number): Promise<{ summary: string }> {
-    return fetchApi<{ summary: string }>(`/documents/${id}/summarize`, {
+  async summarizeDocument(uuid: string): Promise<{ summary: string }> {
+    return fetchApi<{ summary: string }>(`/documents/${uuid}/summarize`, {
       method: 'POST'
     });
   },

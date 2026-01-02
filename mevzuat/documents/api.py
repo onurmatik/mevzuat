@@ -40,6 +40,7 @@ class DocumentOut(Schema):
     """Schema representing a document."""
 
     id: int
+    uuid: UUID
     title: str
     content: Optional[str] = None
     summary: Optional[str] = None
@@ -418,20 +419,20 @@ def list_documents(
     return qs[offset : offset + limit]
 
 
-@router.get("/{document_id}", response=DocumentOut)
-def get_document(request, document_id: int):
+@router.get("/{document_uuid}", response=DocumentOut)
+def get_document(request, document_uuid: UUID):
     """
-    Retrieve a single document by ID.
+    Retrieve a single document by UUID.
     """
-    return get_object_or_404(Document, id=document_id)
+    return get_object_or_404(Document, uuid=document_uuid)
 
 
-@router.post("/{document_id}/summarize")
-def summarize_document(request, document_id: int):
+@router.post("/{document_uuid}/summarize")
+def summarize_document(request, document_uuid: UUID):
     """
     Generate a summary for the document using AI.
     """
-    doc = get_object_or_404(Document, id=document_id)
+    doc = get_object_or_404(Document, uuid=document_uuid)
 
     if not doc.markdown:
         raise HttpError(400, "Document has no markdown content to summarize")

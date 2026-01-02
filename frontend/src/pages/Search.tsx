@@ -90,13 +90,13 @@ export default function SearchPage() {
           // Document has title/type/date/content.
           // Start mapping:
           results = response.data.map(r => ({
-            id: r.attributes.id || 0, // Assuming ID is in attributes
-            title: r.attributes.title || r.filename, // Fallback
-            // content: r.text, // Search result text is chunk
+            id: r.attributes.id || 0,
+            uuid: r.attributes.uuid || '',
+            title: r.attributes.title || r.filename,
             content: null,
             summary: null,
             number: r.attributes.number || null,
-            type: r.type, // slug
+            type: r.type,
             date: r.attributes.date || null
           }));
         }
