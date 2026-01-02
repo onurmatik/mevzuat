@@ -95,6 +95,7 @@ class Document(models.Model):
     oai_file_id = models.CharField(max_length=100, blank=True, null=True)
     embedding = VectorField(dimensions=1536, blank=True, null=True)
     metadata = models.JSONField(default=dict, blank=True)
+    summary = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
