@@ -9,16 +9,6 @@ from django.db import models
 from slugify import slugify
 
 
-class VectorStore(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4)
-    name = models.CharField(max_length=100, unique=True)
-    oai_vs_id = models.CharField(max_length=100, unique=True)
-    description = models.TextField(blank=True, null=True)
-
-    def __str__(self):
-        return self.name
-
-
 class DocumentType(models.Model):
     name = models.CharField(max_length=100, unique=True)
     short_name = models.CharField(max_length=100, unique=True, blank=True, null=True)
@@ -27,10 +17,6 @@ class DocumentType(models.Model):
 
     active = models.BooleanField(default=True)
 
-    vector_store = models.ForeignKey(
-        VectorStore, on_delete=models.SET_NULL,
-        null=True, blank=True
-    )
     fetcher = models.CharField(max_length=50, blank=True, null=True)
 
     def __str__(self):
@@ -138,14 +124,6 @@ class Document(models.Model):
         extra = self._fetcher().extract_metadata(self)
         merged = {**self.metadata, **(extra or {})}
         return merged
-
-    def get_vectorstore_id(self):
-        # Returns the default vectorstore id for this document type.
-        if not self.type:
-            raise ValidationError("Document type is not set")
-        elif not self.type.vector_store:
-            raise ValidationError(f"No vectorstore configured for document type {self.type}")
-        return self.type.vector_store.oai_vs_id
 
     def fetch_and_store_document(self, overwrite=False):
         return self._fetcher().fetch_and_store_document(self, overwrite=overwrite)

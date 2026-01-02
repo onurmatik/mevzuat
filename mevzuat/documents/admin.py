@@ -1,16 +1,11 @@
 from django.contrib import admin, messages
 from django.db.models import Q
-from .models import Document, VectorStore, DocumentType
-
-
-@admin.register(VectorStore)
-class VectorStoreAdmin(admin.ModelAdmin):
-    list_display = ('uuid', 'name')
+from .models import Document, DocumentType
 
 
 @admin.register(DocumentType)
 class DocumentTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'short_name', 'slug', 'active', 'fetcher', 'document_count', 'vector_store')
+    list_display = ('name', 'short_name', 'slug', 'active', 'fetcher', 'document_count')
     list_editable = ('fetcher', 'active')
 
 
@@ -98,22 +93,6 @@ class MarkdownStatusFilter(admin.SimpleListFilter):
         return queryset
 
 
-class InVectorStoreFilter(admin.SimpleListFilter):
-    title = "In vector store?"
-    parameter_name = "in_vs"
-
-    def lookups(self, request, model_admin):
-        return (("yes", "Yes"), ("no", "No"))
-
-    def queryset(self, request, queryset):
-        val = self.value()
-        if val == "yes":
-            return queryset.exclude(oai_file_id="").exclude(oai_file_id__isnull=True)
-        if val == "no":
-            return queryset.filter(Q(oai_file_id="") | Q(oai_file_id__isnull=True))
-        return queryset
-
-
 class MevzuatTurFilter(admin.SimpleListFilter):
     title = "Mevzuat tur"
     parameter_name = "mevzuat_tur"
@@ -174,7 +153,6 @@ class DocumentAdmin(admin.ModelAdmin):
         MevzuatTurFilter,
         MevzuatTertipFilter,
         HasPdfFilter,
-        InVectorStoreFilter,
         HasMdFilter,
         FileSizeFilter,
         MarkdownStatusFilter,
