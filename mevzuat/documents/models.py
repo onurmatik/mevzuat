@@ -171,10 +171,6 @@ class Document(models.Model):
 
         return markdown
 
-    def sync_with_vectorstore(self):
-        """Synchronise this document with the configured vector store."""
-        return self._fetcher().sync_with_vectorstore(self)
-
     def generate_embedding(self, overwrite=False):
         """Generate embedding vector from document content using OpenAI.
         

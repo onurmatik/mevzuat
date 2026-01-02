@@ -182,7 +182,6 @@ class DocumentAdmin(admin.ModelAdmin):
     search_fields = ("uuid", "metadata__mevzuat_no", "title")
     actions = (
         "fetch_document",
-        "sync_with_vectorstore",
         "convert_to_markdown",
         "convert_to_markdown_force_ocr",
         "check_markdown_health",
@@ -354,27 +353,7 @@ class DocumentAdmin(admin.ModelAdmin):
                 level=messages.ERROR,
             )
 
-    def sync_with_vectorstore(self, request, queryset):
-        ok = 0
-        errors = []
-        for obj in queryset:
-            try:
-                obj.sync_with_vectorstore()
-                ok += 1
-            except Exception as exc:  # pragma: no cover - defensive
-                errors.append((obj, exc))
-        if ok:
-            self.message_user(
-                request,
-                f"Successfully synced {ok} document(s).",
-                level=messages.SUCCESS,
-            )
-        for obj, exc in errors:
-            self.message_user(
-                request,
-                f"{obj.title} could not be synced: {exc}",
-                level=messages.ERROR,
-            )
+
 
     def generate_embeddings(self, request, queryset):
         """Generate embeddings for selected documents."""

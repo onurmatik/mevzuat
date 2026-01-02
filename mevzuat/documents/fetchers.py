@@ -118,25 +118,6 @@ class BaseDocFetcher(abc.ABC):
 
         return doc.markdown
 
-    def sync_with_vectorstore(self, doc):
-        """Generate embedding for local vector search.
-
-        This method replaces the previous OpenAI vector store sync.
-        It generates an embedding vector from the document's markdown
-        content and stores it in the database for local similarity search.
-
-        Returns
-        -------
-        list
-            The embedding vector (1536 dimensions).
-
-        Raises
-        ------
-        ValueError
-            If the document has no markdown content.
-        """
-        return doc.generate_embedding()
-
     def _cleanup_conversion(self, result: Optional[object]) -> None:
         """Release docling/pypdfium resources eagerly to avoid shutdown warnings."""
         if result is None:
