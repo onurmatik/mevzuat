@@ -272,9 +272,11 @@ class FetchDocumentsCommandTest(TestCase):
         )
 
         with patch.object(Document, "fetch_and_store_document", autospec=True) as mock_fetch:
-            call_command("fetch_documents")
+            with patch.object(Document, "convert_pdf_to_markdown", autospec=True) as mock_convert:
+                call_command("download_documents")
 
         mock_fetch.assert_called_once_with(doc_missing)
+        mock_convert.assert_called_once_with(doc_missing, overwrite=False)
 
 class DocumentAdminActionErrorTest(TestCase):
     def setUp(self):
