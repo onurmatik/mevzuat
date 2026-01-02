@@ -187,6 +187,7 @@ class DocumentAdmin(admin.ModelAdmin):
         "convert_to_markdown_force_ocr",
         "check_markdown_health",
         "set_file_sizes",
+        "generate_embeddings",
     )
 
     def mevzuat_no(self, obj):
@@ -372,5 +373,38 @@ class DocumentAdmin(admin.ModelAdmin):
             self.message_user(
                 request,
                 f"{obj.title} could not be synced: {exc}",
+                level=messages.ERROR,
+            )
+
+    def generate_embeddings(self, request, queryset):
+        """Generate embeddings for selected documents."""
+        ok = 0
+        skipped = 0
+        errors = []
+        for obj in queryset:
+            if not obj.markdown:
+                skipped += 1
+                continue
+            try:
+                obj.generate_embedding()
+                ok += 1
+            except Exception as exc:  # pragma: no cover - defensive
+                errors.append((obj, exc))
+        if ok:
+            self.message_user(
+                request,
+                f"Successfully generated embeddings for {ok} document(s).",
+                level=messages.SUCCESS,
+            )
+        if skipped:
+            self.message_user(
+                request,
+                f"Skipped {skipped} document(s) because no markdown is stored.",
+                level=messages.WARNING,
+            )
+        for obj, exc in errors:
+            self.message_user(
+                request,
+                f"{obj.title} could not generate embedding: {exc}",
                 level=messages.ERROR,
             )
