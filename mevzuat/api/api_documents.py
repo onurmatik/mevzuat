@@ -12,13 +12,10 @@ from ninja.errors import HttpError
 from ninja.params import Query
 from openai import OpenAI
 
-from .models import Document, DocumentType, VectorStore
+from mevzuat.documents.models import Document, DocumentType, VectorStore
 
 router = Router()
 
-
-from django.contrib.auth import authenticate, login as django_login, logout as django_logout
-from django.middleware.csrf import get_token
 
 class VectorStoreOut(Schema):
     """Schema representing an available vector store."""
@@ -78,136 +75,76 @@ class DocumentTypeOut(Schema):
         from_attributes = True
 
 
-class LoginSchema(Schema):
-    username: str
-    password: str
-
-class UserSchema(Schema):
-    username: str
-    email: str = None
-    first_name: str = None
-    last_name: str = None
-
-@router.post("/auth/login")
-def login(request, data: LoginSchema):
-    user = authenticate(request, username=data.username, password=data.password)
-    if user:
-        django_login(request, user)
-        return {"success": True, "user": {"username": user.username, "email": user.email}}
-    return 401, {"success": False, "message": "Invalid credentials"}
-
-@router.post("/auth/logout")
-def logout(request):
-    django_logout(request)
-    return {"success": True}
-
-@router.get("/auth/me", response={200: UserSchema, 401: None})
-def me(request):
-    if request.user.is_authenticated:
-        return request.user
-    return 401, None
-
-
-
-
-
-
-
-
 @router.get("/search")
 def search_documents(
     request,
     query: str = Query(..., description="Search query"),
     type: Optional[str] = Query(None, description="Document type slug"),
-    date: Optional[date] = Query(None),
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
-    score_threshold: Optional[float] = Query(None),
     limit: int = Query(10),
     offset: int = Query(0),
 ):
-    """Search documents across all vector stores.
+    """Search documents using local pgvector similarity search.
 
-    ``query`` is required. Optional parameters allow filtering by document
-    type and date ranges without exposing the underlying vector stores.
+    ``query`` is required. The query is converted to an embedding vector
+    and compared against document embeddings using cosine similarity.
+    Optional parameters allow filtering by document type and date ranges.
     """
+    from pgvector.django import CosineDistance
 
-    # determine vector stores to search
-    if type:
-        try:
-            dt = (
-                DocumentType.objects
-                .select_related("vector_store")
-                .get(slug=type, vector_store__isnull=False)
-            )
-        except DocumentType.DoesNotExist:
-            raise HttpError(404, "Document type not found")
-        vector_store_ids = [dt.vector_store.oai_vs_id]
-    else:
-        vector_store_ids = list(
-            DocumentType.objects
-            .filter(vector_store__isnull=False)
-            .values_list("vector_store__oai_vs_id", flat=True)
-            .distinct()
-        )
-
-        if not vector_store_ids:
-            raise HttpError(404, "No vector stores configured")
-
-    # build filter dictionary
-    filters: list[dict[str, Any]] = []
-    if type:
-        filters.append({"type": "eq", "key": "type", "value": type})
-    if date:
-        filters.append({"type": "eq", "key": "date", "value": date.isoformat()})
-    else:
-        if start_date:
-            filters.append({"type": "gte", "key": "date", "value": start_date.isoformat()})
-        if end_date:
-            filters.append({"type": "lte", "key": "date", "value": end_date.isoformat()})
-
-    filter_obj: Optional[dict[str, Any]]
-    if not filters:
-        filter_obj = None
-    elif len(filters) == 1:
-        filter_obj = filters[0]
-    else:
-        filter_obj = {"type": "and", "filters": filters}
-
+    # Generate query embedding
     client = OpenAI()
-    ranking_options = {}
-    if score_threshold is not None:
-        ranking_options["score_threshold"] = score_threshold
+    response = client.embeddings.create(
+        model="text-embedding-3-small",
+        input=query,
+        dimensions=1536
+    )
+    query_embedding = response.data[0].embedding
 
-    results: list[dict[str, Any]] = []
-    fetch_count = offset + limit + 1
-    for vs_id in vector_store_ids:
-        search_kwargs = {
-            "vector_store_id": vs_id,
-            "query": query,
-            "max_num_results": fetch_count,
-            "ranking_options": ranking_options or None,
-            "rewrite_query": True,
-        }
-        if filter_obj is not None:
-            search_kwargs["filters"] = filter_obj
-        response = client.vector_stores.search(**search_kwargs)
+    # Build queryset with filters - only include documents with embeddings
+    qs = Document.objects.exclude(embedding__isnull=True).select_related("type")
 
-        for item in response.data:
-            for c in item.content:
-                results.append({
-                    "text": c.text,
-                    "text": c.text,
-                    "type": item.attributes.get("type", "unknown"),  # Use attribs from search result
-                    "filename": item.filename,
-                    "score": item.score,
-                    "attributes": item.attributes,
-                })
+    if type:
+        qs = qs.filter(type__slug=type)
+    if start_date:
+        qs = qs.filter(date__gte=start_date)
+    if end_date:
+        qs = qs.filter(date__lte=end_date)
 
-    results.sort(key=lambda r: r.get("score", 0), reverse=True)
-    page = results[offset:offset + limit]
-    has_more = len(results) > offset + limit
-    return {"data": page, "has_more": has_more}
+    # Order by cosine similarity (lower distance = more similar)
+    qs = qs.annotate(
+        distance=CosineDistance("embedding", query_embedding)
+    ).order_by("distance")
+
+    # Get total count before pagination
+    total_count = qs.count()
+
+    # Paginate results
+    results = list(qs[offset:offset + limit])
+    has_more = total_count > offset + limit
+
+    return {
+        "data": [
+            {
+                "id": doc.id,
+                "uuid": str(doc.uuid),
+                "title": doc.title,
+                "type": doc.type.slug if doc.type else "unknown",
+                "date": doc.date.isoformat() if doc.date else None,
+                "score": round(1 - doc.distance, 4) if doc.distance else 0,
+                "attributes": {
+                    "id": doc.id,
+                    "uuid": str(doc.uuid),
+                    "title": doc.title,
+                    "number": doc.metadata.get("MevzuatNo"),
+                    "date": doc.date.isoformat() if doc.date else None,
+                }
+            }
+            for doc in results
+        ],
+        "has_more": has_more
+    }
 
 
 @router.post("/vector-stores/{vs_uuid}/search")
@@ -457,7 +394,7 @@ def summarize_document(request, document_uuid: UUID):
                 {
                     "role": "user",
                     "content": doc.markdown[:20000],
-                },  # Truncate to avoid token limits if necessary, though 20k chars is usually fine for gpt-4o
+                },
             ],
         )
         summary = completion.choices[0].message.content
@@ -466,4 +403,3 @@ def summarize_document(request, document_uuid: UUID):
         return {"summary": summary}
     except Exception as e:
         raise HttpError(500, f"Error generating summary: {str(e)}")
-

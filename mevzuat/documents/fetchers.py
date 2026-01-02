@@ -119,79 +119,23 @@ class BaseDocFetcher(abc.ABC):
         return doc.markdown
 
     def sync_with_vectorstore(self, doc):
-        """Synchronise the document with the configured OpenAI vector store.
+        """Generate embedding for local vector search.
 
-        If the document was never uploaded before a new OpenAI file is
-        created and attached to the vector store. When the document already
-        has an ``oai_file_id`` only its attributes are updated.
+        This method replaces the previous OpenAI vector store sync.
+        It generates an embedding vector from the document's markdown
+        content and stores it in the database for local similarity search.
 
         Returns
         -------
-        str
-            The OpenAI file id associated with the document.
+        list
+            The embedding vector (1536 dimensions).
 
         Raises
         ------
         ValueError
-            If ``self.document`` is empty.
+            If the document has no markdown content.
         """
-        if not doc.document:
-            raise ValueError("No document available to upload")
-
-        # Import lazily so openai is only required when this method is used.
-        from openai import OpenAI
-
-        client = OpenAI()
-
-        # Build the attributes
-        attributes = {
-            "title": doc.title[:250],
-            "date": doc.date.strftime("%Y-%m-%d"),
-            "type": doc.type.slug,
-        }
-
-        vector_store_id = doc.get_vectorstore_id()
-
-        if doc.oai_file_id:
-            # Update only the attributes on the existing file
-            client.vector_stores.files.update(
-                vector_store_id=vector_store_id,
-                file_id=doc.oai_file_id,
-                attributes=attributes,
-            )
-            return doc.oai_file_id
-
-        # Upload the file to OpenAI first.  Avoid using ``.path`` because
-        # remote storage backends (e.g. S3) do not provide an absolute path.
-        doc.document.open("rb")
-        try:
-            file_tuple = (os.path.basename(doc.document.name), doc.document.read())
-        finally:
-            doc.document.close()
-
-        file_size_updated = False
-        if getattr(doc, "file_size", None) is None:
-            doc.file_size = len(file_tuple[1])
-            file_size_updated = True
-
-        uploaded_file = client.files.create(
-            file=file_tuple, purpose="user_data"
-        )
-
-        doc.oai_file_id = uploaded_file.id
-        fields = ["oai_file_id"]
-        if file_size_updated:
-            fields.append("file_size")
-        doc.save(update_fields=fields)
-
-        # Attach the uploaded file to the vector store
-        client.vector_stores.files.create(
-            vector_store_id=vector_store_id,
-            file_id=uploaded_file.id,
-            attributes=attributes,
-        )
-
-        return uploaded_file.id
+        return doc.generate_embedding()
 
     def _cleanup_conversion(self, result: Optional[object]) -> None:
         """Release docling/pypdfium resources eagerly to avoid shutdown warnings."""

@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      const res = await fetch('/api/documents/auth/me');
+      const res = await fetch('/api/auth/me');
       if (res.ok) {
         const userData = await res.json();
         setUser({ email: userData.email, name: userData.username }); // Map backend user to frontend User
@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // But for this task, I'll update `login` to accept `password` optional.
 
     try {
-      const res = await fetch('/api/documents/auth/login', {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: email, password: password || 'admin' }) // Default pwd for dev?
@@ -83,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await fetch('/api/documents/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/logout', { method: 'POST' });
       setUser(null);
     } catch (e) {
       console.error("Logout error", e);

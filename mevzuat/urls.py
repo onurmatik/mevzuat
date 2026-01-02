@@ -1,12 +1,14 @@
 from django.contrib import admin
 from django.urls import path
 from ninja import NinjaAPI
-from mevzuat.documents.api import router as documents_router
+from mevzuat.api.api_documents import router as documents_router
+from mevzuat.api.api_auth import router as auth_router
 from mevzuat.documents import views as documents_views
 from mevzuat.documents.feeds import LatestDocumentsFeed
 
 
 api = NinjaAPI()
+api.add_router("/auth", auth_router)
 api.add_router("/documents", documents_router)
 
 

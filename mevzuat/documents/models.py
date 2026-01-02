@@ -173,6 +173,35 @@ class Document(models.Model):
         """Synchronise this document with the configured vector store."""
         return self._fetcher().sync_with_vectorstore(self)
 
+    def generate_embedding(self, overwrite=False):
+        """Generate embedding vector from document content using OpenAI.
+        
+        Uses text-embedding-3-small model (1536 dimensions) to create
+        a vector representation of the document's markdown content.
+        """
+        if self.embedding is not None and not overwrite:
+            return self.embedding
+        
+        if not self.markdown:
+            raise ValueError("Document has no markdown content to embed")
+        
+        from openai import OpenAI
+        client = OpenAI()
+        
+        # Use first ~8000 tokens of content (model limit is 8191)
+        # Assuming ~4 chars per token, use first 32k chars
+        text = self.markdown[:32000]
+        
+        response = client.embeddings.create(
+            model="text-embedding-3-small",
+            input=text,
+            dimensions=1536
+        )
+        
+        self.embedding = response.data[0].embedding
+        self.save(update_fields=["embedding"])
+        return self.embedding
+
     def has_markdown_glyph_artifacts(self, *, threshold=None):
         """Return True if markdown resembles direct glyph dumps from PDFs."""
         if not self.markdown:
