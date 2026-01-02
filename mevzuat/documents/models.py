@@ -85,6 +85,7 @@ class Document(models.Model):
     type = models.ForeignKey(DocumentType, on_delete=models.SET_NULL, null=True, blank=True, related_name='documents')
 
     title = models.CharField(max_length=1000)
+    title_en = models.CharField(max_length=1000, blank=True, null=True)
     date = models.DateField(blank=True, null=True)  # The significant date for the doc; e.g.: effective date, pub date, etc.
 
     document = models.FileField(upload_to=document_upload_to, blank=True, null=True)
@@ -96,6 +97,7 @@ class Document(models.Model):
     embedding = VectorField(dimensions=1536, blank=True, null=True)
     metadata = models.JSONField(default=dict, blank=True)
     summary = models.TextField(blank=True, null=True)
+    summary_en = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
