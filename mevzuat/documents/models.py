@@ -79,7 +79,6 @@ class Document(models.Model):
     markdown = models.TextField(blank=True, null=True)
     markdown_status = models.CharField(max_length=20, choices=MARKDOWN_STATUS_CHOICES, blank=True, null=True)
 
-    oai_file_id = models.CharField(max_length=100, blank=True, null=True)
     embedding = VectorField(dimensions=1536, blank=True, null=True)
     metadata = models.JSONField(default=dict, blank=True)
     summary = models.TextField(blank=True, null=True)

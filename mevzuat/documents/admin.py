@@ -159,7 +159,6 @@ class DocumentAdmin(admin.ModelAdmin):
         "date",
         "created_at",
         "has_pdf",
-        "in_vs",
         "has_md",
         "has_embedding",
         "markdown_status",
@@ -207,10 +206,6 @@ class DocumentAdmin(admin.ModelAdmin):
     @admin.display(boolean=True, description="Has embedding?")
     def has_embedding(self, obj: Document) -> bool:
         return obj.embedding is not None
-
-    @admin.display(boolean=True, description="In VS?")
-    def in_vs(self, obj: Document) -> bool:
-        return bool(obj.oai_file_id)
 
     def fetch_document(self, request, queryset):
         ok = 0
