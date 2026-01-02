@@ -148,7 +148,7 @@ class Document(models.Model):
     def fetch_and_store_document(self, overwrite=False):
         return self._fetcher().fetch_and_store_document(self, overwrite=overwrite)
 
-    def convert_pdf_to_markdown(self, overwrite=False, *, force_ocr=False):
+    def convert_pdf_to_markdown(self, overwrite=False, *, force_ocr=True):
         markdown = self._fetcher().convert_pdf_to_markdown(
             self,
             overwrite=overwrite,
