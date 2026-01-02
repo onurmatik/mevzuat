@@ -379,28 +379,11 @@ def summarize_document(request, document_uuid: UUID):
     """
     doc = get_object_or_404(Document, uuid=document_uuid)
 
-    if not doc.markdown:
-        raise HttpError(400, "Document has no markdown content to summarize")
-
-    client = OpenAI()
     try:
-        completion = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a helpful assistant that summarizes legal documents. Provide a concise summary of the following document in Turkish.",
-                },
-                {
-                    "role": "user",
-                    "content": doc.markdown[:20000],
-                },
-            ],
-        )
-        summary = completion.choices[0].message.content
-        doc.summary = summary
-        doc.save()
+        summary = doc.summarize()
         return {"summary": summary}
+    except ValueError as e:
+        raise HttpError(400, str(e))
     except Exception as e:
         raise HttpError(500, f"Error generating summary: {str(e)}")
 
@@ -412,63 +395,12 @@ def translate_document(request, document_uuid: UUID):
     """
     doc = get_object_or_404(Document, uuid=document_uuid)
 
-    if not doc.title:
-        raise HttpError(400, "Document has no title to translate")
-
-    client = OpenAI()
-    
-    # Build the translation prompt
-    texts_to_translate = []
-    if doc.title:
-        texts_to_translate.append(f"Title: {doc.title}")
-    if doc.summary:
-        texts_to_translate.append(f"Summary: {doc.summary}")
-    
-    if not texts_to_translate:
-        raise HttpError(400, "No content to translate")
-    
-    prompt = "Translate the following Turkish legal document metadata to English. Keep the format exactly as provided (Title: and Summary: labels).\n\n" + "\n\n".join(texts_to_translate)
-    
     try:
-        completion = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a professional translator specializing in Turkish legal documents. Translate accurately to English while preserving legal terminology.",
-                },
-                {
-                    "role": "user",
-                    "content": prompt,
-                },
-            ],
-        )
-        
-        response_text = completion.choices[0].message.content
-        
-        # Parse the response
-        lines = response_text.strip().split("\n")
-        for line in lines:
-            line = line.strip()
-            if line.lower().startswith("title:"):
-                doc.title_en = line[6:].strip()
-            elif line.lower().startswith("summary:"):
-                doc.summary_en = line[8:].strip()
-        
-        # Save updated translations
-        update_fields = []
-        if doc.title_en:
-            update_fields.append("title_en")
-        if doc.summary_en:
-            update_fields.append("summary_en")
-        
-        if update_fields:
-            doc.save(update_fields=update_fields)
-        
-        return {
-            "title_en": doc.title_en,
-            "summary_en": doc.summary_en,
-        }
+        result = doc.translate()
+        return result
+    except ValueError as e:
+        raise HttpError(400, str(e))
     except Exception as e:
         raise HttpError(500, f"Error translating document: {str(e)}")
+
 

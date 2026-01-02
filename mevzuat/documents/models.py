@@ -207,3 +207,95 @@ class Document(models.Model):
         threshold = threshold or self.GLYPH_ARTIFACT_THRESHOLD
         matches = self.GLYPH_ARTIFACT_PATTERN.findall(self.markdown)
         return len(matches) >= threshold
+
+    def summarize(self, overwrite=False):
+        """Generate a summary for the document using OpenAI.
+        
+        Uses GPT-4o to create a concise summary of the document content.
+        """
+        if self.summary and not overwrite:
+            return self.summary
+        
+        if not self.markdown:
+            raise ValueError("Document has no markdown content to summarize")
+        
+        from openai import OpenAI
+        client = OpenAI()
+        
+        completion = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant that summarizes legal documents. Provide a concise summary of the following document in Turkish.",
+                },
+                {
+                    "role": "user",
+                    "content": self.markdown[:20000],
+                },
+            ],
+        )
+        
+        self.summary = completion.choices[0].message.content
+        self.save(update_fields=["summary"])
+        return self.summary
+
+    def translate(self, overwrite=False):
+        """Translate title and summary from Turkish to English using OpenAI.
+        
+        Stores translations in title_en and summary_en fields.
+        """
+        if not overwrite and self.title_en:
+            return {"title_en": self.title_en, "summary_en": self.summary_en}
+        
+        if not self.title:
+            raise ValueError("Document has no title to translate")
+        
+        from openai import OpenAI
+        client = OpenAI()
+        
+        # Build the translation prompt
+        texts_to_translate = []
+        if self.title:
+            texts_to_translate.append(f"Title: {self.title}")
+        if self.summary:
+            texts_to_translate.append(f"Summary: {self.summary}")
+        
+        prompt = "Translate the following Turkish legal document metadata to English. Keep the format exactly as provided (Title: and Summary: labels).\n\n" + "\n\n".join(texts_to_translate)
+        
+        completion = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a professional translator specializing in Turkish legal documents. Translate accurately to English while preserving legal terminology.",
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+        )
+        
+        response_text = completion.choices[0].message.content
+        
+        # Parse the response
+        lines = response_text.strip().split("\n")
+        for line in lines:
+            line = line.strip()
+            if line.lower().startswith("title:"):
+                self.title_en = line[6:].strip()
+            elif line.lower().startswith("summary:"):
+                self.summary_en = line[8:].strip()
+        
+        # Save updated translations
+        update_fields = []
+        if self.title_en:
+            update_fields.append("title_en")
+        if self.summary_en:
+            update_fields.append("summary_en")
+        
+        if update_fields:
+            self.save(update_fields=update_fields)
+        
+        return {"title_en": self.title_en, "summary_en": self.summary_en}

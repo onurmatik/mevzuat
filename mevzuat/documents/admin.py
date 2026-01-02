@@ -187,6 +187,8 @@ class DocumentAdmin(admin.ModelAdmin):
         "check_markdown_health",
         "set_file_sizes",
         "generate_embeddings",
+        "summarize_documents",
+        "translate_documents",
     )
 
     def mevzuat_no(self, obj):
@@ -385,5 +387,71 @@ class DocumentAdmin(admin.ModelAdmin):
             self.message_user(
                 request,
                 f"{obj.title} could not generate embedding: {exc}",
+                level=messages.ERROR,
+            )
+
+    def summarize_documents(self, request, queryset):
+        """Generate summaries for selected documents."""
+        ok = 0
+        skipped = 0
+        errors = []
+        for obj in queryset:
+            if not obj.markdown:
+                skipped += 1
+                continue
+            try:
+                obj.summarize()
+                ok += 1
+            except Exception as exc:  # pragma: no cover - defensive
+                errors.append((obj, exc))
+        if ok:
+            self.message_user(
+                request,
+                f"Successfully summarized {ok} document(s).",
+                level=messages.SUCCESS,
+            )
+        if skipped:
+            self.message_user(
+                request,
+                f"Skipped {skipped} document(s) because no markdown is stored.",
+                level=messages.WARNING,
+            )
+        for obj, exc in errors:
+            self.message_user(
+                request,
+                f"{obj.title} could not be summarized: {exc}",
+                level=messages.ERROR,
+            )
+
+    def translate_documents(self, request, queryset):
+        """Translate title and summary to English for selected documents."""
+        ok = 0
+        skipped = 0
+        errors = []
+        for obj in queryset:
+            if not obj.title:
+                skipped += 1
+                continue
+            try:
+                obj.translate()
+                ok += 1
+            except Exception as exc:  # pragma: no cover - defensive
+                errors.append((obj, exc))
+        if ok:
+            self.message_user(
+                request,
+                f"Successfully translated {ok} document(s).",
+                level=messages.SUCCESS,
+            )
+        if skipped:
+            self.message_user(
+                request,
+                f"Skipped {skipped} document(s) because no title is available.",
+                level=messages.WARNING,
+            )
+        for obj, exc in errors:
+            self.message_user(
+                request,
+                f"{obj.title} could not be translated: {exc}",
                 level=messages.ERROR,
             )
