@@ -8,7 +8,7 @@ import { DOC_TYPE_LABELS } from '../data/mock'; // Keep labels for now, or fetch
 // For now, I'll keep using mock labels if slugs match.
 import { useLanguage } from '../store/language';
 import { api, Document } from '../lib/api';
-import { cn, mapSlugToDocType } from '../lib/utils';
+import { cn } from '../lib/utils';
 
 export default function DocumentDetail() {
   const { id } = useParams<{ id: string }>();
@@ -78,7 +78,7 @@ export default function DocumentDetail() {
   }
 
   // Fallback for type label if not found in MOCK
-  const typeKey = mapSlugToDocType(doc.type);
+  const typeKey = doc.type;
   const typeLabel = (DOC_TYPE_LABELS as any)[typeKey]?.[language] || doc.type;
 
   return (

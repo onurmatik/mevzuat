@@ -331,9 +331,9 @@ def document_counts(
     # --- Aggregate counts -------------------------------------------------------
     qs = (
         qs.annotate(period=truncator)
-        .values("period", "type__name")
+        .values("period", "type__slug")
         .annotate(count=Count("id"))
-        .order_by("period", "type__name")
+        .order_by("period", "type__slug")
     )
 
     # --- Normalise output so it’s JSON-serialisable -----------------------------
@@ -343,7 +343,7 @@ def document_counts(
         results.append(
             {
                 "period": period.isoformat(),
-                "type": row["type__name"] or "Unknown",
+                "type": row["type__slug"] or "unknown",
                 "count": row["count"],
             }
         )

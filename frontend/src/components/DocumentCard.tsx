@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Hash, Calendar, FileText } from 'lucide-react';
 import { Document } from '../lib/api';
 import { DOC_TYPE_LABELS } from '../data/mock';
-import { cn, mapSlugToDocType } from '../lib/utils';
+import { cn } from '../lib/utils';
 import { useLanguage } from '../store/language';
 
 interface DocumentCardProps {
@@ -12,7 +12,7 @@ interface DocumentCardProps {
 
 export function DocumentCard({ doc }: DocumentCardProps) {
   const { language } = useLanguage();
-  const typeKey = mapSlugToDocType(doc.type);
+  const typeKey = doc.type;
   const typeLabel = (DOC_TYPE_LABELS as any)[typeKey]?.[language] || doc.type;
 
   return (

@@ -1,7 +1,7 @@
 export const MOCK_DOCUMENTS = [
   {
     id: '1',
-    type: 'law',
+    type: 'kanun',
     number: '7499',
     date: '12.03.2024',
     title: 'Ceza Muhakemesi Kanunu ile Bazı Kanunlarda Değişiklik Yapılmasına Dair Kanun',
@@ -19,7 +19,7 @@ export const MOCK_DOCUMENTS = [
   },
   {
     id: '2',
-    type: 'cb_karar',
+    type: 'cb-karar',
     number: '158',
     date: '10.03.2024',
     title: 'Bazı Kurum ve Kuruluşlara Kadro İhdas Edilmesine İlişkin Cumhurbaşkanlığı Kararnamesi',
@@ -28,7 +28,7 @@ export const MOCK_DOCUMENTS = [
   },
   {
     id: '3',
-    type: 'cb_yonetmelik',
+    type: 'cb-yonetmelik',
     number: '32485',
     date: '08.03.2024',
     title: 'Yapay Zeka Sistemlerinin Güvenli Kullanımına Dair Yönetmelik Taslağı',
@@ -37,7 +37,7 @@ export const MOCK_DOCUMENTS = [
   },
   {
     id: '4',
-    type: 'law',
+    type: 'kanun',
     number: '7498',
     date: '01.03.2024',
     title: 'Afet Riski Altındaki Alanların Dönüştürülmesi Hakkında Kanun Değişikliği',
@@ -81,13 +81,15 @@ export const MOCK_STATS_YEARLY = [
   { name: '2024', kanun: 18, khk: 5, cb_kararname: 10, cb_yonetmelik: 20, cb_karar: 12, cb_genelge: 8 },
 ];
 
-export type DocType = 'law' | 'khk' | 'cb_kararname' | 'cb_yonetmelik' | 'cb_karar' | 'cb_genelge';
+export type DocType = 'kanun' | 'khk' | 'cb-kararname' | 'cb-yonetmelik' | 'cb-karar' | 'cb-genelge' | 'yonetmelik' | 'teblig';
 
 export const DOC_TYPE_LABELS = {
-  law: { tr: 'Kanun', en: 'Law' },
+  kanun: { tr: 'Kanun', en: 'Law' },
   khk: { tr: 'KHK', en: 'Decree Law' },
-  cb_kararname: { tr: 'CB Kararnamesi', en: 'Pres. Decree' },
-  cb_yonetmelik: { tr: 'CB Yönetmeliği', en: 'Pres. Regulation' },
-  cb_karar: { tr: 'CB Kararı', en: 'Pres. Decision' },
-  cb_genelge: { tr: 'CB Genelgesi', en: 'Pres. Circular' },
+  'cb-kararname': { tr: 'CB Kararnamesi', en: 'Pres. Decree' },
+  'cb-yonetmelik': { tr: 'CB Yönetmeliği', en: 'Pres. Regulation' },
+  'cb-karar': { tr: 'CB Kararı', en: 'Pres. Decision' },
+  'cb-genelge': { tr: 'CB Genelgesi', en: 'Pres. Circular' },
+  yonetmelik: { tr: 'Yönetmelik', en: 'Regulation' },
+  teblig: { tr: 'Tebliğ', en: 'Communiqué' },
 };

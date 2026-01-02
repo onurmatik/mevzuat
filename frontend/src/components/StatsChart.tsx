@@ -11,7 +11,7 @@ interface StatsChartProps {
   data?: StatsData[];
 }
 
-import { mapSlugToDocType } from '../lib/utils';
+
 
 export function StatsChart({ timeRange = '30days', data: apiData }: StatsChartProps) {
   const { language } = useLanguage();
@@ -28,18 +28,18 @@ export function StatsChart({ timeRange = '30days', data: apiData }: StatsChartPr
 
         // Format label based on timeRange
         if (timeRange === '30days') {
-          label = format(date, 'd', { locale: language === 'tr' ? tr : enUS });
+          label = format(date, 'd MMM', { locale: language === 'tr' ? tr : enUS }); // 12 Mar
         } else if (timeRange === '12months') {
-          label = format(date, 'MMM', { locale: language === 'tr' ? tr : enUS });
+          label = format(date, 'MMM yy', { locale: language === 'tr' ? tr : enUS }); // Mar 24
         } else {
-          label = format(date, 'yyyy', { locale: language === 'tr' ? tr : enUS });
+          label = format(date, 'yyyy', { locale: language === 'tr' ? tr : enUS }); // 2024
         }
 
         if (!grouped.has(key)) {
           grouped.set(key, { name: label, originalDate: date });
         }
         const entry = grouped.get(key);
-        const typeKey = mapSlugToDocType(item.type);
+        const typeKey = item.type;
 
         entry[typeKey] = (entry[typeKey] || 0) + item.count;
       });
@@ -102,10 +102,10 @@ export function StatsChart({ timeRange = '30days', data: apiData }: StatsChartPr
           {/* Order matches legend: Kanun, KHK, CB Kararname, CB Yönetmelik, CB Karar, CB Genelge */}
           <Bar dataKey="kanun" name="Kanun" stackId="a" fill="#18181b" radius={[0, 0, 0, 0]} />
           <Bar dataKey="khk" name="KHK" stackId="a" fill="#dc2626" />
-          <Bar dataKey="cb_kararname" name="CB Kararname" stackId="a" fill="#d97706" />
-          <Bar dataKey="cb_yonetmelik" name="CB Yönetmelik" stackId="a" fill="#7c3aed" />
-          <Bar dataKey="cb_karar" name="CB Karar" stackId="a" fill="#2563eb" />
-          <Bar dataKey="cb_genelge" name="CB Genelge" stackId="a" fill="#059669" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="cb-kararname" name="CB Kararname" stackId="a" fill="#d97706" />
+          <Bar dataKey="cb-yonetmelik" name="CB Yönetmelik" stackId="a" fill="#7c3aed" />
+          <Bar dataKey="cb-karar" name="CB Karar" stackId="a" fill="#2563eb" />
+          <Bar dataKey="cb-genelge" name="CB Genelge" stackId="a" fill="#059669" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
