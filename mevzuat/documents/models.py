@@ -152,29 +152,63 @@ class Document(models.Model):
         
         Uses text-embedding-3-small model (1536 dimensions) to create
         a vector representation of the document's markdown content.
+        
+        Includes title and summary in the embedded text, and retries with
+        smaller chunks if the context length is exceeded.
         """
         if self.embedding is not None and not overwrite:
             return self.embedding
         
         if not self.markdown:
-            raise ValueError("Document has no markdown content to embed")
+            # Fallback: if no markdown, at least try with title/summary
+            if not self.title:
+                raise ValueError("Document has no content to embed (no markdown or title)")
         
-        from openai import OpenAI
+        from openai import OpenAI, BadRequestError
         client = OpenAI()
         
-        # Use first ~8000 tokens of content (model limit is 8191)
-        # Assuming ~4 chars per token, use first 32k chars
-        text = self.markdown[:32000]
+        # 1. Construct the text to embed
+        parts = []
+        if self.title:
+            parts.append(f"Title: {self.title}")
+        if self.summary:
+            parts.append(f"Summary: {self.summary}")
+        if self.markdown:
+            parts.append(self.markdown)
+            
+        full_text = "\n\n".join(parts)
         
-        response = client.embeddings.create(
-            model="text-embedding-3-small",
-            input=text,
-            dimensions=1536
-        )
+        if not full_text.strip():
+             raise ValueError("No content to embed")
+
+        # 2. Retry logic for context length
+        # Start with a safe-ish upper bound. The model limit is 8191 tokens.
+        # 32k chars is roughly 8k tokens (very rough approx).
+        limit = 32000 
         
-        self.embedding = response.data[0].embedding
-        self.save(update_fields=["embedding"])
-        return self.embedding
+        while limit > 100:
+            text = full_text[:limit]
+            try:
+                response = client.embeddings.create(
+                    model="text-embedding-3-small",
+                    input=text,
+                    dimensions=1536
+                )
+                self.embedding = response.data[0].embedding
+                self.save(update_fields=["embedding"])
+                return self.embedding
+                
+            except BadRequestError as e:
+                # Check if it's a context length error
+                err_str = str(e).lower()
+                if "context_length_exceeded" in err_str or "maximum context length" in err_str:
+                    # Reduce length by 20% and retry
+                    limit = int(limit * 0.8)
+                    continue
+                # If it's another kind of BadRequest, re-raise
+                raise
+                
+        raise ValueError("Could not generate embedding even with reduced context")
 
     def has_markdown_glyph_artifacts(self, *, threshold=None):
         """Return True if markdown resembles direct glyph dumps from PDFs."""

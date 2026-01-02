@@ -220,4 +220,59 @@ class FetchNewCommandTest(TestCase):
         self.assertEqual(Document.objects.filter(type=dt_inactive).count(), 0)
 
 
+class EmbeddingGenerationTest(TestCase):
+    def setUp(self):
+        self.doc = Document.objects.create(
+            title="Test Doc",
+            summary="Test Summary",
+            markdown="Content " * 1000,
+            metadata={}
+        )
+
+    @patch("openai.OpenAI")
+    def test_embedding_includes_title_and_summary(self, mock_openai):
+        mock_client = mock_openai.return_value
+        mock_client.embeddings.create.return_value.data = [SimpleNamespace(embedding=[0.1] * 1536)]
+        
+        self.doc.generate_embedding()
+        
+        call_args = mock_client.embeddings.create.call_args
+        sent_text = call_args.kwargs['input']
+        
+        self.assertIn("Title: Test Doc", sent_text)
+        self.assertIn("Summary: Test Summary", sent_text)
+        self.assertIn("Content", sent_text)
+
+    @patch("openai.OpenAI")
+    def test_embedding_retries_on_context_length_error(self, mock_openai):
+        from openai import BadRequestError
+        
+        mock_client = mock_openai.return_value
+        # Mock response to raise error first, then succeed
+        mock_response = SimpleNamespace(request=SimpleNamespace(), status_code=400) # Needed for exception constructor if it inspects response
+        
+        error = BadRequestError("This model's maximum context length is 8192 tokens...", response=mock_response, body=None)
+        
+        # Setup side effect: Raise error twice, then return success
+        mock_client.embeddings.create.side_effect = [
+            error,
+            error, 
+            SimpleNamespace(data=[SimpleNamespace(embedding=[0.1] * 1536)])
+        ]
+        
+        self.doc.generate_embedding()
+        
+        # Should have been called 3 times
+        self.assertEqual(mock_client.embeddings.create.call_count, 3)
+        
+        # Check that input length decreased
+        calls = mock_client.embeddings.create.call_args_list
+        len1 = len(calls[0].kwargs['input'])
+        len2 = len(calls[1].kwargs['input'])
+        len3 = len(calls[2].kwargs['input'])
+        
+        self.assertLess(len2, len1)
+        self.assertLess(len3, len2)
+
+
 
