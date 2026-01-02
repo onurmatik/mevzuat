@@ -17,16 +17,12 @@ export interface DocumentType {
   label: string; // mapped from name
 }
 
-export interface VectorStore {
-  uuid: string;
-  name: string;
-  description?: string;
-}
-
 export interface SearchResult {
-  text: string;
+  id: number;
+  uuid: string;
+  title: string;
   type: string;
-  filename: string;
+  date: string | null;
   score: number;
   attributes: Record<string, any>;
 }

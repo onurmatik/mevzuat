@@ -11,12 +11,11 @@ and document retrieval.
 - Ingest and catalog official legislation documents with reliable metadata.
 - Persist original PDFs and optional Markdown conversions.
 - Provide search and discovery via UI, API, RSS, and MCP tools.
-- Support vector-store sync for semantic search.
+- Support semantic search via local embeddings.
 - Offer admin workflows for bulk processing and data hygiene.
 
 ## Non-goals
-- Full-text search stored locally in the database (search is delegated to
-  OpenAI vector stores).
+- Full-text search stored locally in the database (search uses pgvector).
 - Automated metadata enrichment beyond the source payload (fetcher metadata
   extraction is currently a stub).
 - A dedicated frontend app (UI is server-rendered Django templates).
@@ -24,7 +23,7 @@ and document retrieval.
 ## Primary users and actors
 - Public visitors: view recent documents, search, and read document details.
 - API consumers: use JSON endpoints to list, count, and search documents.
-- Admin users: manage document types, vector stores, and ingestion workflows.
+- Admin users: manage document types and ingestion workflows.
 - MCP clients: access the same data programmatically through tools.
 
 ## User-facing features
@@ -34,7 +33,7 @@ and document retrieval.
   - Shows a stacked bar chart of document counts by type and time range.
   - Exposes quick links to API and MCP docs.
 - Search page
-  - Keyword search backed by vector stores.
+  - Keyword search backed by pgvector.
   - Filters by type and date range (predefined or custom).
   - Infinite scroll for results and sortable ordering (relevance or date).
   - Summary panel with result counts by type and month.
@@ -46,10 +45,10 @@ and document retrieval.
   - `/rss/latest/` exposes the 20 most recently created documents.
 
 ### Admin interface
-- Manage `VectorStore` and `DocumentType` entries.
+- Manage `DocumentType` entries.
 - Document list filters for:
   - Presence of PDF and Markdown
-  - Vector store sync status
+
   - Markdown status (success, warning, failed, unset)
   - File size buckets
   - Mevzuat type and tertip from metadata
@@ -58,13 +57,13 @@ and document retrieval.
   - Convert PDFs to Markdown (with or without forced OCR)
   - Check Markdown for glyph artifacts and flag warnings
   - Set missing file sizes
-  - Sync with vector stores
+
 
 ## API surface (Django Ninja)
 Base path: `/api/documents`
 
 - `GET /types`
-  - Returns document types with vector stores configured.
+  - Returns document types.
 - `GET /counts`
   - Returns counts grouped by day, month, or year.
   - Filters by `start_date` and `end_date`.
@@ -73,34 +72,26 @@ Base path: `/api/documents`
   - Date filters precedence: `date`, then `start_date`/`end_date`, then
     `year`/`month`.
 - `GET /search`
-  - Searches across vector stores via OpenAI.
-  - Supports type and date filters and optional score threshold.
-- `GET /vector-stores`
-  - Lists available vector stores by UUID, name, and description.
-- `POST /vector-stores/{vs_uuid}/search`
-  - Searches a specific vector store with filters and options.
+  - Searches documents using similar embeddings.
+  - Supports type and date filters.
 
 ## MCP server
 FastMCP server (stateless HTTP) exposes the same data as tools:
 - `types` -> list document types
 - `counts` -> document counts by interval
 - `list` -> list documents with filters
-- `search` -> vector search across stores
+- `search` -> semantic search for documents
 
 The MCP server is started via `python -m mevzuat.mcp_server` and requires
 Django settings to be configured in the environment.
 
 ## Data model
-### VectorStore
-- `uuid`: internal identifier.
-- `name`: display name (unique).
-- `oai_vs_id`: OpenAI vector store id (unique).
-- `description`: optional text.
+
 
 ### DocumentType
 - `name`, `short_name`, `slug`, `description`.
 - `active`: controls whether ingestion and sync include this type.
-- `vector_store`: optional FK to VectorStore.
+
 - `fetcher`: class name for the document fetcher.
 
 ### Document
@@ -112,7 +103,7 @@ Django settings to be configured in the environment.
 - `file_size`: size in bytes.
 - `markdown`: Markdown conversion of the PDF.
 - `markdown_status`: success, warning, failed, or unset.
-- `oai_file_id`: OpenAI file id for the uploaded PDF.
+- `oai_file_id`: OpenAI file id for the uploaded PDF (unused).
 - `embedding`: pgvector field (currently unused in search).
 - `metadata`: raw JSON payload from mevzuat.gov.tr.
 - `created_at`: ingestion timestamp.
@@ -141,11 +132,7 @@ Admin action and model method: `convert_pdf_to_markdown`
 - Optionally forces OCR (Turkish language) when glyph artifacts are detected.
 - Updates `markdown_status` and `file_size` if missing.
 
-### Sync with OpenAI vector stores
-Management command: `sync_vectorstore`
-- Uploads PDFs to OpenAI if not already uploaded.
-- Attaches the file to the configured vector store with attributes:
-  `title`, `date`, and `type` (slug).
+
 
 ## Scripts and operations
 - `scripts/mevzuat_scraper.py`: fetches first-page data with auto anti-forgery
@@ -165,12 +152,12 @@ Management command: `sync_vectorstore`
   - S3 via `AWS_STORAGE_BUCKET_NAME` using django-storages.
 - External services:
   - mevzuat.gov.tr for source metadata and PDFs.
-  - OpenAI for vector store upload and search.
+  - OpenAI for embedding generation and translation.
 
 ## Error handling and edge cases
 - If a PDF is missing or the URL is invalid, download fails with a request
   exception.
-- Vector search returns 404 when no vector stores are configured.
+
 - Markdown conversion marks warnings when glyph artifacts are detected and will
   re-run with OCR if needed.
 - Some scripts require manually refreshed cookies/tokens from the source site.

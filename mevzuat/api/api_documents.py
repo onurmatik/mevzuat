@@ -12,25 +12,12 @@ from ninja.errors import HttpError
 from ninja.params import Query
 from openai import OpenAI
 
-from mevzuat.documents.models import Document, DocumentType, VectorStore
+from mevzuat.documents.models import Document, DocumentType
 
 router = Router()
 
 
-class VectorStoreOut(Schema):
-    """Schema representing an available vector store."""
 
-    uuid: UUID
-    name: str
-    description: Optional[str] = None
-
-
-class VectorSearchPayload(Schema):
-    query: str
-    limit: int = 10
-    score_threshold: Optional[float] = None
-    rewrite_query: bool = True
-    filters: Optional[dict] = None
 
 
 class DocumentOut(Schema):
@@ -42,6 +29,7 @@ class DocumentOut(Schema):
     content: Optional[str] = None
     summary: Optional[str] = None
     number: Optional[str] = None
+    date: Optional[date] = None
     type: str = Field(..., alias="type.slug")
 
     class Config:
@@ -147,80 +135,11 @@ def search_documents(
     }
 
 
-@router.post("/vector-stores/{vs_uuid}/search")
-def search_vector_store(
-    request,
-    vs_uuid: UUID,
-    payload: VectorSearchPayload,
-) -> Any:
-    """
-    Query a vector store **by its UUID** and return the relevant results from OpenAI.
-
-    * ``vs_uuid`` – The UUID of the :class:`VectorStore` object.
-      The view resolves this to the underlying ``oai_vs_id`` that OpenAI expects.
-    * ``filters`` – Optional filter dictionary passed directly to OpenAI, allowing
-      restriction of results by file attributes such as document type or date.
-    """
-
-    try:
-        vs = VectorStore.objects.only("oai_vs_id").get(uuid=vs_uuid)
-    except VectorStore.DoesNotExist:
-        raise HttpError(404, "Vector store not found")
-
-    client = OpenAI()
-
-    ranking_options = {}
-    if payload.score_threshold is not None:
-        ranking_options["score_threshold"] = payload.score_threshold
-
-    search_kwargs = {
-        "vector_store_id": vs.oai_vs_id,
-        "query": payload.query,
-        "max_num_results": payload.limit,
-        "ranking_options": ranking_options or None,
-        "rewrite_query": payload.rewrite_query,
-    }
-    if payload.filters is not None:
-        search_kwargs["filters"] = payload.filters
-
-    response = client.vector_stores.search(**search_kwargs)
-
-    return response
-
-@router.get("/vector-stores", response=List[VectorStoreOut])
-def list_vector_stores(request):
-    """
-    Return a list of all available vector stores sorted by name.
-
-    The response is a list of objects with the following shape:
-
-    ```json
-    [
-      {
-        "uuid": "1f4b3d2e-e57b-4f33-9c5f-5fbad829e7f8",
-        "name": "LegalDocs",
-        "description": "Vector store holding legislation and case law"
-      },
-      ...
-    ]
-    ```
-    """
-    qs = (
-        VectorStore.objects
-        .values("uuid", "name", "description")
-        .order_by("name")
-    )
-
-    # Convert QuerySet of dicts to list so Ninja can serialise it cleanly
-    return list(qs)
-
-
 @router.get("/types", response=List[DocumentTypeOut])
 def list_document_types(request):
     """Return all available document types ordered by name."""
     return (
         DocumentType.objects
-        .filter(vector_store__isnull=False)
         .only("id", "name")
         .order_by("name")
     )

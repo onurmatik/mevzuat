@@ -9,8 +9,8 @@ from django.core.files.base import ContentFile
 from django.test import TestCase, override_settings, RequestFactory
 from django.core.management import call_command
 
-from .admin import DocumentAdmin, MevzuatTertibFilter
-from .models import Document, DocumentType, VectorStore
+from .admin import DocumentAdmin, MevzuatTertipFilter
+from .models import Document, DocumentType
 
 
 class DocumentListAPITest(TestCase):
@@ -69,7 +69,7 @@ class DocumentListAPITest(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(len(data), 2)
-        self.assertTrue(all(item["type"] == 1 for item in data))
+        self.assertTrue(all(item["type"] == "kanun" for item in data))
 
     def test_filter_by_year(self):
         response = self.client.get("/api/documents/list", {"year": 2021})
@@ -83,7 +83,7 @@ class DocumentListAPITest(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(len(data), 1)
-        self.assertEqual(data[0]["type"], 1)
+        self.assertEqual(data[0]["type"], "kanun")
         self.assertTrue(data[0]["date"].startswith("2021"))
 
     def test_filter_by_month(self):
@@ -111,142 +111,31 @@ class DocumentListAPITest(TestCase):
 
 class DocumentTypeAPITest(TestCase):
     def setUp(self):
-        vs = VectorStore.objects.create(name="VS1", oai_vs_id="vs1")
-        DocumentType.objects.create(
-            id=1,
-            name="Kanun",
-            fetcher="MevzuatFetcher",
-            vector_store=vs,
-        )
-        DocumentType.objects.create(id=2, name="Tüzük", fetcher="MevzuatFetcher")
-
-    def test_list_document_types(self):
-        response = self.client.get("/api/documents/types")
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertEqual(data, [{"id": 1, "label": "Kanun"}])
-
-
-class VectorStoreSearchAPITest(TestCase):
-    def setUp(self):
-        self.vs = VectorStore.objects.create(name="VS1", oai_vs_id="vs1")
-
-    @patch("mevzuat.documents.api.OpenAI")
-    def test_search_with_filters(self, MockOpenAI):
-        instance = MockOpenAI.return_value
-        instance.vector_stores.search.return_value = {"data": []}
-
-        payload = {
-            "query": "term",
-            "filters": {"type": "eq", "key": "type", "value": "blog"},
-        }
-
-        url = f"/api/documents/vector-stores/{self.vs.uuid}/search"
-        response = self.client.post(
-            url, data=json.dumps(payload), content_type="application/json"
-        )
-        self.assertEqual(response.status_code, 200)
-
-        instance.vector_stores.search.assert_called_with(
-            vector_store_id="vs1",
-            query="term",
-            filters={"type": "eq", "key": "type", "value": "blog"},
-            max_num_results=10,
-            ranking_options=None,
-            rewrite_query=True,
-        )
-
-
-class DocumentSearchAPITest(TestCase):
-    def setUp(self):
-        self.vs1 = VectorStore.objects.create(name="VS1", oai_vs_id="vs1")
-        self.vs2 = VectorStore.objects.create(name="VS2", oai_vs_id="vs2")
         DocumentType.objects.create(
             id=1,
             name="Kanun",
             slug="kanun",
             fetcher="MevzuatFetcher",
-            vector_store=self.vs1,
         )
-        DocumentType.objects.create(
-            id=2,
-            name="Tüzük",
-            slug="tuzuk",
-            fetcher="MevzuatFetcher",
-            vector_store=self.vs2,
-        )
+        DocumentType.objects.create(id=2, name="Tüzük", slug="tuzuk", fetcher="MevzuatFetcher")
 
-    @patch("mevzuat.documents.api.OpenAI")
-    def test_search_across_vector_stores(self, MockOpenAI):
-        instance = MockOpenAI.return_value
-        instance.vector_stores.search.return_value = SimpleNamespace(data=[])
-
-        response = self.client.get("/api/documents/search", {"query": "term"})
+    def test_list_document_types(self):
+        response = self.client.get("/api/documents/types")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(instance.vector_stores.search.call_count, 2)
+        data = response.json()
+        self.assertEqual(data, [{"id": 1, "label": "Kanun"}, {"id": 2, "label": "Tüzük"}])
 
-    @patch("mevzuat.documents.api.OpenAI")
-    def test_search_with_filters(self, MockOpenAI):
-        instance = MockOpenAI.return_value
-        instance.vector_stores.search.return_value = SimpleNamespace(data=[])
 
-        params = {
-            "query": "term",
-            "type": "kanun",
-            "start_date": "2020-01-01",
-            "end_date": "2020-12-31",
-        }
-        response = self.client.get("/api/documents/search", params)
-        self.assertEqual(response.status_code, 200)
 
-        instance.vector_stores.search.assert_called_once()
-        args, kwargs = instance.vector_stores.search.call_args
-        self.assertEqual(kwargs["vector_store_id"], "vs1")
-        self.assertEqual(kwargs["query"], "term")
-        self.assertEqual(kwargs["max_num_results"], 11)
-        expected_filters = {
-            "type": "and",
-            "filters": [
-                {"type": "eq", "key": "type", "value": "kanun"},
-                {"type": "gte", "key": "date", "value": "2020-01-01"},
-                {"type": "lte", "key": "date", "value": "2020-12-31"},
-            ],
-        }
-        self.assertEqual(kwargs["filters"], expected_filters)
 
-    @patch("mevzuat.documents.api.OpenAI")
-    def test_search_pagination(self, MockOpenAI):
-        instance = MockOpenAI.return_value
-        item = SimpleNamespace(
-            content=[SimpleNamespace(text="t", type="text")],
-            filename="f",
-            score=1.0,
-            attributes={"type": "kanun"},
-        )
-        instance.vector_stores.search.return_value = SimpleNamespace(data=[item, item, item])
 
-        response = self.client.get(
-            "/api/documents/search", {"query": "term", "limit": 2, "type": "kanun"}
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.json()["has_more"])
 
-        response = self.client.get(
-            "/api/documents/search",
-            {"query": "term", "limit": 2, "offset": 2, "type": "kanun"},
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.json()["has_more"])
-
-        calls = instance.vector_stores.search.call_args_list
-        self.assertEqual(calls[0].kwargs["max_num_results"], 3)
-        self.assertEqual(calls[1].kwargs["max_num_results"], 5)
 
 
 class DocumentAdminConfigTest(TestCase):
     def test_mevzuat_tertib_in_admin_lists(self):
         self.assertIn("mevzuat_tertib", DocumentAdmin.list_display)
-        self.assertIn(MevzuatTertibFilter, DocumentAdmin.list_filter)
+        self.assertIn(MevzuatTertipFilter, DocumentAdmin.list_filter)
 
 
 class FetchDocumentsCommandTest(TestCase):
@@ -304,47 +193,10 @@ class DocumentAdminActionErrorTest(TestCase):
     def test_convert_to_markdown_shows_error(self):
         self._assert_error("convert_to_markdown", "convert_pdf_to_markdown")
 
-    def test_sync_with_vectorstore_shows_error(self):
-        self._assert_error("sync_with_vectorstore", "sync_with_vectorstore")
 
 
-class DocumentSyncWithVectorStoreStorageTest(TestCase):
-    def setUp(self):
-        vs = VectorStore.objects.create(name="VS1", oai_vs_id="vs1")
-        doc_type = DocumentType.objects.create(
-            name="Kanun", fetcher="MevzuatFetcher", vector_store=vs
-        )
-        self.doc = Document.objects.create(
-            title="Doc",
-            type=doc_type,
-            document=ContentFile(b"a", name="doc.pdf"),
-            metadata={
-                "mevzuat_tur": 1,
-                "mevzuat_tertib": 1,
-                "mevzuat_no": "1",
-                "resmiGazeteTarihi": "01.01.2020",
-            },
-        )
 
-    @patch("openai.OpenAI")
-    def test_sync_uses_storage_open(self, MockOpenAI):
-        client = MockOpenAI.return_value
-        client.files.create.return_value = SimpleNamespace(id="file-123")
-        client.vector_stores.files.create.return_value = None
 
-        # Simulate a storage backend where ``.path`` is unsupported
-        with patch.object(type(self.doc.document), "path", new_callable=PropertyMock, side_effect=NotImplementedError):
-            with patch.object(self.doc.document, "open", wraps=self.doc.document.open) as mock_open:
-                self.doc.sync_with_vectorstore()
-                mock_open.assert_called_once_with("rb")
-
-        self.assertEqual(self.doc.oai_file_id, "file-123")
-        client.files.create.assert_called_once()
-        file_arg = client.files.create.call_args.kwargs["file"]
-        self.assertIsInstance(file_arg, tuple)
-        self.assertTrue(file_arg[0].endswith(".pdf"))
-        self.assertEqual(file_arg[1], b"a")
-        client.vector_stores.files.create.assert_called_once()
 
 
 class FetchNewCommandTest(TestCase):
@@ -366,18 +218,4 @@ class FetchNewCommandTest(TestCase):
         self.assertEqual(Document.objects.filter(type=dt_inactive).count(), 0)
 
 
-class SyncVectorstoreCommandTest(TestCase):
-    @patch("mevzuat.documents.models.Document.sync_with_vectorstore", autospec=True)
-    def test_syncs_unprocessed_active_documents(self, mock_sync):
-        dt_active = DocumentType.objects.create(name="Active", fetcher="KanunFetcher", active=True)
-        dt_inactive = DocumentType.objects.create(name="Inactive", fetcher="KanunFetcher", active=False)
-        doc1 = Document.objects.create(title="Doc1", type=dt_active)
-        doc2 = Document.objects.create(title="Doc2", type=dt_active, oai_file_id="")
-        Document.objects.create(title="Doc3", type=dt_active, oai_file_id="file-1")
-        Document.objects.create(title="Doc4", type=dt_inactive)
 
-        call_command("sync_vectorstore")
-
-        self.assertEqual(mock_sync.call_count, 2)
-        called_pks = {call.args[0].pk for call in mock_sync.call_args_list}
-        self.assertEqual(called_pks, {doc1.pk, doc2.pk})
