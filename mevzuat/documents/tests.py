@@ -9,7 +9,13 @@ from django.core.files.base import ContentFile
 from django.test import TestCase, override_settings, RequestFactory
 from django.core.management import call_command
 
-from .admin import DocumentAdmin, MevzuatTertipFilter, HasEmbeddingFilter
+from .admin import (
+    DocumentAdmin,
+    MevzuatTertipFilter,
+    HasEmbeddingFilter,
+    TranslatedFilter,
+    SummarizedFilter,
+)
 from .models import Document, DocumentType
 
 
@@ -138,6 +144,10 @@ class DocumentAdminConfigTest(TestCase):
         self.assertIn(MevzuatTertipFilter, DocumentAdmin.list_filter)
         self.assertIn("has_embedding", DocumentAdmin.list_display)
         self.assertIn(HasEmbeddingFilter, DocumentAdmin.list_filter)
+        self.assertIn("is_translated", DocumentAdmin.list_display)
+        self.assertIn(TranslatedFilter, DocumentAdmin.list_filter)
+        self.assertIn("is_summarized", DocumentAdmin.list_display)
+        self.assertIn(SummarizedFilter, DocumentAdmin.list_filter)
 
 
 class FetchDocumentsCommandTest(TestCase):
@@ -225,7 +235,7 @@ class EmbeddingGenerationTest(TestCase):
         self.doc = Document.objects.create(
             title="Test Doc",
             summary="Test Summary",
-            markdown="Content " * 1000,
+            markdown="Content " * 5000, # ~40k chars
             metadata={}
         )
 
@@ -249,7 +259,7 @@ class EmbeddingGenerationTest(TestCase):
         
         mock_client = mock_openai.return_value
         # Mock response to raise error first, then succeed
-        mock_response = SimpleNamespace(request=SimpleNamespace(), status_code=400) # Needed for exception constructor if it inspects response
+        mock_response = SimpleNamespace(request=SimpleNamespace(), status_code=400, headers={}) # Needed for exception constructor if it inspects response
         
         error = BadRequestError("This model's maximum context length is 8192 tokens...", response=mock_response, body=None)
         

@@ -57,6 +57,41 @@ class HasEmbeddingFilter(admin.SimpleListFilter):
         return queryset
 
 
+
+
+
+class TranslatedFilter(admin.SimpleListFilter):
+    title = "Translated?"
+    parameter_name = "is_translated"
+
+    def lookups(self, request, model_admin):
+        return (("yes", "Yes"), ("no", "No"))
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        if val == "yes":
+            return queryset.exclude(title_en__isnull=True).exclude(title_en="")
+        if val == "no":
+            return queryset.filter(Q(title_en__isnull=True) | Q(title_en=""))
+        return queryset
+
+
+class SummarizedFilter(admin.SimpleListFilter):
+    title = "Summarized?"
+    parameter_name = "is_summarized"
+
+    def lookups(self, request, model_admin):
+        return (("yes", "Yes"), ("no", "No"))
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        if val == "yes":
+            return queryset.exclude(summary__isnull=True).exclude(summary="")
+        if val == "no":
+            return queryset.filter(Q(summary__isnull=True) | Q(summary=""))
+        return queryset
+
+
 class FileSizeFilter(admin.SimpleListFilter):
     title = "File size"
     parameter_name = "file_size_bucket"
@@ -156,12 +191,15 @@ class DocumentAdmin(admin.ModelAdmin):
         "mevzuat_no",
         "type",
         "file_size",
+        "md_length",
         "date",
         "created_at",
         "has_pdf",
         "has_md",
         "has_embedding",
         "markdown_status",
+        "is_translated",
+        "is_summarized",
     )
     list_filter = (
         "type",
@@ -171,6 +209,8 @@ class DocumentAdmin(admin.ModelAdmin):
         HasPdfFilter,
         HasMdFilter,
         HasEmbeddingFilter,
+        TranslatedFilter,
+        SummarizedFilter,
         FileSizeFilter,
         MarkdownStatusFilter,
     )
@@ -195,6 +235,9 @@ class DocumentAdmin(admin.ModelAdmin):
     def mevzuat_tur(self, obj):
         return obj.metadata.get("mevzuatTur")
 
+    def md_length(self, obj):
+        return len(obj.markdown)
+
     @admin.display(boolean=True, description="Has pdf?", ordering="document")
     def has_pdf(self, obj: Document) -> bool:
         return bool(obj.document)
@@ -206,6 +249,14 @@ class DocumentAdmin(admin.ModelAdmin):
     @admin.display(boolean=True, description="Has embedding?")
     def has_embedding(self, obj: Document) -> bool:
         return obj.embedding is not None
+
+    @admin.display(boolean=True, description="Translated?")
+    def is_translated(self, obj: Document) -> bool:
+        return bool(obj.title_en)
+
+    @admin.display(boolean=True, description="Summarized?")
+    def is_summarized(self, obj: Document) -> bool:
+        return bool(obj.summary)
 
     def fetch_document(self, request, queryset):
         ok = 0
@@ -395,7 +446,7 @@ class DocumentAdmin(admin.ModelAdmin):
                 skipped += 1
                 continue
             try:
-                obj.summarize()
+                obj.summarize(overwrite=True)
                 ok += 1
             except Exception as exc:  # pragma: no cover - defensive
                 errors.append((obj, exc))

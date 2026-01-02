@@ -166,21 +166,12 @@ class Document(models.Model):
         from openai import OpenAI, BadRequestError
         client = OpenAI()
         
-        # 1. Construct the text to embed
-        parts = []
-        if self.title:
-            parts.append(f"Title: {self.title}")
-        if self.summary:
-            parts.append(f"Summary: {self.summary}")
-        if self.markdown:
-            parts.append(self.markdown)
-            
-        full_text = "\n\n".join(parts)
+        full_text = f"{self.title}\n\n{self.markdown}"
         
         if not full_text.strip():
              raise ValueError("No content to embed")
 
-        # 2. Retry logic for context length
+        # Retry logic for context length
         # Start with a safe-ish upper bound. The model limit is 8191 tokens.
         # 32k chars is roughly 8k tokens (very rough approx).
         limit = 32000 
@@ -232,11 +223,15 @@ class Document(models.Model):
         client = OpenAI()
         
         completion = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-5-nano",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a helpful assistant that summarizes legal documents. Provide a concise summary of the following document in Turkish.",
+                    "content": "You are a helpful assistant that summarizes legal documents. "
+                               "Provide a practical impact summary in Turkish. "
+                               "Write a neutral, factual statement with no added context. "
+                               "Exclude all formal and administrative details "
+                               "(such as dates, numbers, signatures, authorities, and legal references). "
                 },
                 {
                     "role": "user",
