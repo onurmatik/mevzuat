@@ -96,7 +96,6 @@ class Document(models.Model):
         super().save(*args, **kwargs)
 
     class Meta:
-        """
         indexes = [
             HnswIndex(
                 name='topiccontent_embedding_hnsw',
@@ -106,7 +105,6 @@ class Document(models.Model):
                 opclasses=['vector_l2_ops']
             )
         ]
-        """
 
     def _fetcher(self):
         from .fetchers import get

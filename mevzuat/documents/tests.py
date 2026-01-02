@@ -134,7 +134,7 @@ class DocumentTypeAPITest(TestCase):
 
 class DocumentAdminConfigTest(TestCase):
     def test_mevzuat_tertib_in_admin_lists(self):
-        self.assertIn("mevzuat_tertib", DocumentAdmin.list_display)
+        self.assertIn("mevzuat_tertip", DocumentAdmin.list_display)
         self.assertIn(MevzuatTertipFilter, DocumentAdmin.list_filter)
 
 

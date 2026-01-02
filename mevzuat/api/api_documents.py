@@ -1,6 +1,6 @@
 from typing import Optional, Any, List
 from uuid import UUID
-from datetime import date
+from datetime import date as dt_date
 
 from django.utils import timezone
 from django.db.models import Count, Min, IntegerField, DateField
@@ -17,9 +17,6 @@ from mevzuat.documents.models import Document, DocumentType
 router = Router()
 
 
-
-
-
 class DocumentOut(Schema):
     """Schema representing a document."""
 
@@ -29,7 +26,7 @@ class DocumentOut(Schema):
     content: Optional[str] = None
     summary: Optional[str] = None
     number: Optional[str] = None
-    date: Optional[date] = None
+    date: Optional[dt_date] = None
     type: str = Field(..., alias="type.slug")
 
     class Config:
@@ -68,8 +65,8 @@ def search_documents(
     request,
     query: str = Query(..., description="Search query"),
     type: Optional[str] = Query(None, description="Document type slug"),
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
+    start_date: Optional[dt_date] = Query(None),
+    end_date: Optional[dt_date] = Query(None),
     limit: int = Query(10),
     offset: int = Query(0),
 ):
@@ -148,8 +145,8 @@ def list_document_types(request):
 @router.get("/counts")
 def document_counts(
     request,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+    start_date: Optional[dt_date] = None,
+    end_date: Optional[dt_date] = None,
     interval: str = "day",
 ) -> list[dict[str, Any]]:
     """
@@ -222,9 +219,9 @@ def list_documents(
     type: Optional[int] = Query(None, description="DocumentType ID"),
     year: Optional[int] = Query(None, ge=1900),
     month: Optional[int] = Query(None, ge=1, le=12),
-    date: Optional[date] = Query(None),
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
+    date: Optional[dt_date] = Query(None),
+    start_date: Optional[dt_date] = Query(None),
+    end_date: Optional[dt_date] = Query(None),
     limit: int = Query(10, ge=1),
     offset: int = Query(0, ge=0),
 ):
