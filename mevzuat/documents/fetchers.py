@@ -31,7 +31,7 @@ class BaseDocFetcher(abc.ABC):
             doc: "Document",
             *,
             overwrite: bool = False,
-            force_ocr: bool = False,
+            force_ocr: bool = True,
     ) -> str:
         """Convert the stored PDF into Markdown and persist it.
 
@@ -39,7 +39,7 @@ class BaseDocFetcher(abc.ABC):
         ----------
         overwrite : bool, default False
             If ``False`` and ``self.markdown`` already exists, do nothing.
-        force_ocr : bool, default False
+        force_ocr : bool, default True
             If ``True`` the conversion pipeline runs OCR on every page even when
             embedded text exists. Useful when PDFs have poor text layers.
 
