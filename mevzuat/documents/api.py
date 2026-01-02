@@ -303,22 +303,27 @@ def document_counts(
     (``Document.date``) is used. ``end_date`` defaults to today.
     ``interval`` may be one of ``"day"``, ``"month"`` or ``"year"``.
     """
+    from django.core.cache import cache
+
     if interval not in {"day", "month", "year"}:
         raise HttpError(400, "``interval`` must be one of 'day', 'month' or 'year'")
+
+    # Build cache key from parameters
+    cache_key = f"doc_counts:{interval}:{start_date}:{end_date}"
+    cached_result = cache.get(cache_key)
+    if cached_result is not None:
+        return cached_result
 
     qs = Document.objects.all()
 
     # --- Default date boundaries ------------------------------------------------
     if start_date is None:
         first_ts = qs.order_by("date").values_list("date", flat=True).first()
-        # If there are no documents yet, default to today so we don’t blow up later.
+        # If there are no documents yet, default to today so we don't blow up later.
         start_date = first_ts if first_ts else timezone.now().date()
 
     if end_date is None:
         end_date = timezone.now().date()
-
-    # initial cutoff
-
 
     qs = qs.filter(date__gte=start_date, date__lte=end_date)
 
@@ -337,7 +342,7 @@ def document_counts(
         .order_by("period", "type__slug")
     )
 
-    # --- Normalise output so it’s JSON-serialisable -----------------------------
+    # --- Normalise output so it's JSON-serialisable -----------------------------
     results: list[dict[str, Any]] = []
     for row in qs:
         period = row["period"]
@@ -348,6 +353,9 @@ def document_counts(
                 "count": row["count"],
             }
         )
+
+    # Cache for 1 hour (3600 seconds)
+    cache.set(cache_key, results, 3600)
 
     return results
 
