@@ -82,26 +82,26 @@ export const api = {
     // I should add one.
     // For now, I'll filter by ID using list if possible, but `list_documents` doesn't filter by ID.
     // I will add `retrieve_document` to `api.py`.
-    
+
     // TEMPORARY: using list and filtering client side or mock fall back?
     // No, I should implement the backend endpoint.
     // I'll proceed with writing this client assuming the endpoint exists (documents/{id})
     // Note: The React route uses `id`, which might be int or uuid. `DocumentOut` uses int `id`.
     // The backend `Document` model has `uuid` and `id`.
     // I'll assume we'll use integer ID for API consistency.
-    
+
     return fetchApi<Document>(`/documents/${id}`);
   },
 
   async summarizeDocument(id: number): Promise<{ summary: string }> {
     return fetchApi<{ summary: string }>(`/documents/${id}/summarize`, {
-        method: 'POST'
+      method: 'POST'
     });
   },
 
   async searchDocuments(query: string, params?: Record<string, any>): Promise<SearchResponse> {
     const searchParams = new URLSearchParams({ query });
-     if (params) {
+    if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
           searchParams.append(key, String(value));
@@ -115,7 +115,11 @@ export const api = {
     return fetchApi<DocumentType[]>('/documents/types');
   },
 
-  async getStats(interval: 'day' | 'month' | 'year' = 'month'): Promise<StatsData[]> {
-    return fetchApi<StatsData[]>(`/documents/counts?interval=${interval}`);
+  async getStats(interval: 'day' | 'month' | 'year' = 'month', startDate?: string, endDate?: string): Promise<StatsData[]> {
+    const params = new URLSearchParams({ interval });
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+
+    return fetchApi<StatsData[]>(`/documents/counts?${params.toString()}`);
   }
 };

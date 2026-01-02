@@ -31,7 +31,23 @@ export default function Home() {
           '12months': 'month',
           'all': 'year'
         };
-        const statsData = await api.getStats(intervalMap[timeRange]);
+        const today = new Date();
+        let startDate: string | undefined;
+
+        if (timeRange === '30days') {
+          const d = new Date(today);
+          d.setDate(d.getDate() - 30);
+          startDate = d.toISOString().split('T')[0];
+        } else if (timeRange === '12months') {
+          const d = new Date(today);
+          d.setMonth(d.getMonth() - 12);
+          startDate = d.toISOString().split('T')[0];
+        } else if (timeRange === 'all') {
+          // Explicitly set 1980 as cutoff for "All Time"
+          startDate = '1980-01-01';
+        }
+
+        const statsData = await api.getStats(intervalMap[timeRange], startDate);
         setStats(statsData);
       } catch (e) {
         console.error("Failed to load home data", e);

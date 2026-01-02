@@ -317,7 +317,7 @@ def document_counts(
         end_date = timezone.now().date()
 
     # initial cutoff
-    qs = qs.filter(date__year__gte=2000)
+
 
     qs = qs.filter(date__gte=start_date, date__lte=end_date)
 
