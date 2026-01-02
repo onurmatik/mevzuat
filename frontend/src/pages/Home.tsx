@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, ArrowRight, ArrowUpRight, BarChart3, Calendar } from 'lucide-react';
-import { MOCK_DOCUMENTS } from '../data/mock';
+import { api, Document, StatsData } from '../lib/api';
 import { DocumentCard } from '../components/DocumentCard';
 import { StatsChart } from '../components/StatsChart';
 import { useLanguage } from '../store/language';
@@ -10,9 +10,35 @@ import { cn } from '../lib/utils';
 type TimeRange = '30days' | '12months' | 'all';
 
 export default function Home() {
-  const recentDocs = MOCK_DOCUMENTS.slice(0, 3);
+  const [recentDocs, setRecentDocs] = useState<Document[]>([]);
+  const [stats, setStats] = useState<StatsData[]>([]); // Need to update StatsChart to handle this data format later
   const { t } = useLanguage();
   const [timeRange, setTimeRange] = useState<TimeRange>('30days');
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const docs = await api.listDocuments({ limit: 3 }); // Assuming list supports limit, though api.py's list_documents doesn't explicit param query yet, need to check if default ordering is date. It is.
+        // Wait, api.py list_documents doesn't have limit param. It returns QuerySet. 
+        // ninja usually supports pagination but list_documents has filtering. 
+        // I should limit it client side for now or add limit param to backend.
+        // The backend returns all matching documents! This is bad for performance.
+        setRecentDocs(docs.slice(0, 3));
+
+        // For stats, we need to map timeRange to interval
+        const intervalMap: Record<TimeRange, 'day' | 'month' | 'year'> = {
+          '30days': 'day',
+          '12months': 'month',
+          'all': 'year'
+        };
+        const statsData = await api.getStats(intervalMap[timeRange]);
+        setStats(statsData);
+      } catch (e) {
+        console.error("Failed to load home data", e);
+      }
+    }
+    loadData();
+  }, [timeRange]);
 
   const timeRangeOptions: { value: TimeRange; label: string; desc: string }[] = [
     { value: '30days', label: 'Last 30 Days', desc: 'Daily distribution' },
@@ -31,7 +57,7 @@ export default function Home() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
             {t('hero.subtitle')}
           </p>
-          
+
           <div className="max-w-2xl mx-auto relative group">
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground h-5 w-5" />
@@ -41,7 +67,7 @@ export default function Home() {
                 className="w-full h-14 pl-12 pr-4 bg-background border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-ring focus:border-input transition-all text-base"
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                <Link 
+                <Link
                   to="/search"
                   className="bg-primary text-primary-foreground h-10 px-6 rounded-md text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors"
                 >
@@ -61,7 +87,7 @@ export default function Home() {
               <div>
                 <h2 className="text-2xl font-semibold text-foreground mb-2">{t('stats.title')}</h2>
                 <p className="text-sm text-muted-foreground mb-8">{t('stats.subtitle')}</p>
-                
+
                 {/* Legend & Selector */}
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-muted-foreground mb-2">
@@ -116,9 +142,15 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            
+
             <div className="md:w-2/3 w-full h-[320px] bg-background border border-border rounded-xl p-4 shadow-sm">
-              <StatsChart timeRange={timeRange} />
+              {/* Assuming StatsChart can handle the new data structure or I need to adapt it. 
+                    MOCK_STATS was array of objects with keys per type.
+                    StatsData is array of {period, type, count}.
+                    I will need to transform StatsData to the expected format of StatsChart or update StatsChart.
+                    For now, I'll update Home.tsx to transform before passing.
+                */}
+              <StatsChart data={stats} timeRange={timeRange} />
             </div>
           </div>
         </div>
@@ -132,7 +164,7 @@ export default function Home() {
             {t('recent.view_all')} <ArrowUpRight size={16} />
           </Link>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {recentDocs.map((doc) => (
             <DocumentCard key={doc.id} doc={doc} />

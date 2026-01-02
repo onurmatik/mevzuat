@@ -7,32 +7,28 @@ import { useAuth } from '../store/auth';
 export function AuthModal() {
   const { isAuthModalOpen, closeAuthModal, login } = useAuth();
   const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const { t } = useLanguage();
 
   if (!isAuthModalOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSent(true);
-    // Simulate magic link delay then auto-login for demo purposes
-    // In a real app, user would click the link in email
-    setTimeout(() => {
-      login(email);
-      setSent(false);
-      setEmail('');
-    }, 1500);
+    setLoading(true);
+    await login(email, password);
+    setLoading(false);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.98 }}
         className="bg-card w-full max-w-md border border-border rounded-lg shadow-lg p-6 relative"
       >
-        <button 
+        <button
           onClick={closeAuthModal}
           className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
         >
@@ -47,39 +43,45 @@ export function AuthModal() {
             {t('auth.modal_title')}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-             {sent ? t('auth.check_email') : t('nav.continue_email')}
+            Login with your credentials
           </p>
         </div>
 
-        {!sent ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
-                {t('auth.email_label')}
-              </label>
-              <input 
-                type="email" 
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@company.com"
-                className="w-full bg-background border border-input rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input transition-all"
-              />
-            </div>
-            <button 
-              type="submit"
-              className="w-full bg-primary text-primary-foreground py-2.5 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm"
-            >
-              {t('auth.submit')}
-            </button>
-          </form>
-        ) : (
-          <div className="text-center py-4">
-            <div className="animate-pulse text-primary font-medium">
-              {t('auth.sent')}
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
+              {t('auth.email_label')}
+            </label>
+            <input
+              type="text"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Username or Email"
+              className="w-full bg-background border border-input rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input transition-all"
+            />
           </div>
-        )}
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
+              Password
+            </label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              className="w-full bg-background border border-input rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-input transition-all"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-primary text-primary-foreground py-2.5 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50"
+          >
+            {loading ? "Logging in..." : t('auth.submit')}
+          </button>
+        </form>
       </motion.div>
     </div>
   );

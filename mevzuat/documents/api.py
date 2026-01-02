@@ -5,6 +5,7 @@ from datetime import date
 from django.utils import timezone
 from django.db.models import Count, Min, IntegerField, DateField
 from django.db.models.functions import ExtractYear, Cast, Coalesce, TruncDay, TruncMonth, TruncYear
+from django.shortcuts import get_object_or_404
 from pydantic import Field
 from ninja import Router, Schema
 from ninja.errors import HttpError
@@ -15,6 +16,9 @@ from .models import Document, DocumentType, VectorStore
 
 router = Router()
 
+
+from django.contrib.auth import authenticate, login as django_login, logout as django_logout
+from django.middleware.csrf import get_token
 
 class VectorStoreOut(Schema):
     """Schema representing an available vector store."""
@@ -37,12 +41,30 @@ class DocumentOut(Schema):
 
     id: int
     title: str
-    type: int = Field(..., alias="type_id")   # FK → plain integer in the payload
-    date: Optional[date]
+    content: Optional[str] = None
+    summary: Optional[str] = None
+    number: Optional[str] = None
+    type: str = Field(..., alias="type.slug")
 
     class Config:
         from_attributes = True
         populate_by_name = True
+
+    @staticmethod
+    def resolve_content(obj):
+        return obj.markdown
+
+    @staticmethod
+    def resolve_summary(obj):
+        return obj.summary
+
+    @staticmethod
+    def resolve_number(obj):
+        return obj.metadata.get("MevzuatNo")
+
+    @staticmethod
+    def resolve_type(obj):
+        return obj.type.slug if obj.type else None
 
 
 class DocumentTypeOut(Schema):
@@ -53,6 +75,42 @@ class DocumentTypeOut(Schema):
 
     class Config:
         from_attributes = True
+
+
+class LoginSchema(Schema):
+    username: str
+    password: str
+
+class UserSchema(Schema):
+    username: str
+    email: str = None
+    first_name: str = None
+    last_name: str = None
+
+@router.post("/auth/login")
+def login(request, data: LoginSchema):
+    user = authenticate(request, username=data.username, password=data.password)
+    if user:
+        django_login(request, user)
+        return {"success": True, "user": {"username": user.username, "email": user.email}}
+    return 401, {"success": False, "message": "Invalid credentials"}
+
+@router.post("/auth/logout")
+def logout(request):
+    django_logout(request)
+    return {"success": True}
+
+@router.get("/auth/me", response={200: UserSchema, 401: None})
+def me(request):
+    if request.user.is_authenticated:
+        return request.user
+    return 401, None
+
+
+
+
+
+
 
 
 @router.get("/search")
@@ -138,7 +196,8 @@ def search_documents(
             for c in item.content:
                 results.append({
                     "text": c.text,
-                    "type": c.type,
+                    "text": c.text,
+                    "type": item.attributes.get("type", "unknown"),  # Use attribs from search result
                     "filename": item.filename,
                     "score": item.score,
                     "attributes": item.attributes,
@@ -301,6 +360,8 @@ def list_documents(
     date: Optional[date] = Query(None),
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
+    limit: int = Query(10, ge=1),
+    offset: int = Query(0, ge=0),
 ):
     """
     Return documents filtered by type and/or their significant date.
@@ -348,7 +409,52 @@ def list_documents(
     # exclude null dates and types
     qs = qs.exclude(date__isnull=True).exclude(date__isnull=True)
 
-    # order newest-first
+    match_count = qs.count()
     qs = qs.order_by("-date", "-id")
 
-    return qs
+    # Hard limit of 100 if user asks for more, default 10
+    limit = min(limit, 100)
+    
+    return qs[offset : offset + limit]
+
+
+@router.get("/{document_id}", response=DocumentOut)
+def get_document(request, document_id: int):
+    """
+    Retrieve a single document by ID.
+    """
+    return get_object_or_404(Document, id=document_id)
+
+
+@router.post("/{document_id}/summarize")
+def summarize_document(request, document_id: int):
+    """
+    Generate a summary for the document using AI.
+    """
+    doc = get_object_or_404(Document, id=document_id)
+
+    if not doc.markdown:
+        raise HttpError(400, "Document has no markdown content to summarize")
+
+    client = OpenAI()
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant that summarizes legal documents. Provide a concise summary of the following document in Turkish.",
+                },
+                {
+                    "role": "user",
+                    "content": doc.markdown[:20000],
+                },  # Truncate to avoid token limits if necessary, though 20k chars is usually fine for gpt-4o
+            ],
+        )
+        summary = completion.choices[0].message.content
+        doc.summary = summary
+        doc.save()
+        return {"summary": summary}
+    except Exception as e:
+        raise HttpError(500, f"Error generating summary: {str(e)}")
+
