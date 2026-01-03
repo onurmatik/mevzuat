@@ -2,6 +2,8 @@ from datetime import datetime
 import re
 import uuid
 from functools import cached_property
+
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 
 from pgvector.django import VectorField, L2Distance, HnswIndex, HalfVectorField
@@ -303,3 +305,13 @@ class Document(models.Model):
             self.save(update_fields=update_fields)
         
         return {"title_en": self.title_en, "summary_en": self.summary_en}
+
+
+class FlaggedDocument(models.Model):
+    document = models.ForeignKey(Document, on_delete=models.CASCADE)
+    flagged_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    flagged_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.document.title} {self.flagged_by} {self.flagged_at}"
+
