@@ -6,6 +6,7 @@ from unittest.mock import patch, PropertyMock
 
 from django.contrib import admin, messages
 from django.core.files.base import ContentFile
+from django.contrib.auth.models import User
 from django.test import TestCase, override_settings, RequestFactory
 from django.core.management import call_command
 
@@ -15,8 +16,9 @@ from .admin import (
     HasEmbeddingFilter,
     TranslatedFilter,
     SummarizedFilter,
+    FlaggedDocumentAdmin,
 )
-from .models import Document, DocumentType
+from .models import Document, DocumentType, FlaggedDocument
 
 
 class DocumentListAPITest(TestCase):
@@ -249,8 +251,8 @@ class EmbeddingGenerationTest(TestCase):
         call_args = mock_client.embeddings.create.call_args
         sent_text = call_args.kwargs['input']
         
-        self.assertIn("Title: Test Doc", sent_text)
-        self.assertIn("Summary: Test Summary", sent_text)
+        self.assertIn("Test Doc", sent_text)
+        # Summary checks removed as summary is no longer included
         self.assertIn("Content", sent_text)
 
     @patch("openai.OpenAI")
@@ -283,6 +285,24 @@ class EmbeddingGenerationTest(TestCase):
         
         self.assertLess(len2, len1)
         self.assertLess(len3, len2)
+
+
+class FlaggingTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="testuser", password="password")
+        self.doc = Document.objects.create(title="Test Doc", markdown="Content", metadata={})
+        self.client.force_login(self.user)
+
+    def test_flag_document(self):
+        response = self.client.post(f"/api/documents/{self.doc.uuid}/flag")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(FlaggedDocument.objects.filter(document=self.doc, flagged_by=self.user).exists())
+
+    def test_flag_document_unauthenticated(self):
+        self.client.logout()
+        response = self.client.post(f"/api/documents/{self.doc.uuid}/flag")
+        self.assertNotEqual(response.status_code, 200) # Should be 401 or 403 depending on auth config
+
 
 
 

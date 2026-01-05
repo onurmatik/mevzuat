@@ -15,8 +15,8 @@ const translations: Record<string, Record<Language, string>> = {
   'nav.login': { tr: 'Giriş Yap', en: 'Login' },
   'nav.continue_email': { tr: 'E-posta ile Devam Et', en: 'Continue with Email' },
   
-  'hero.title': { tr: 'Mevzuatın Geleceği.', en: 'The Future of Legislation.' },
-  'hero.subtitle': { tr: 'Türk hukuku için yapay zeka destekli, avant-garde bir arama motoru.', en: 'AI-powered, avant-garde search engine for Turkish law.' },
+  'hero.title': { tr: 'Erişilebilir Mevzuat.', en: 'Accessible Legislation.' },
+  'hero.subtitle': { tr: 'Türk hukuku için yapay zekâ destekli arama motoru.', en: 'An AI-powered search engine for Turkish law.' },
   'hero.search_placeholder': { tr: 'Kanun, kararname, yönetmelik ara...', en: 'Search laws, decrees, regulations...' },
   'hero.search_action': { tr: 'ARA', en: 'SEARCH' },
   
@@ -50,6 +50,7 @@ const translations: Record<string, Record<Language, string>> = {
   'search.saved': { tr: 'Arama Kaydedildi', en: 'Search Saved' },
   'search.related_to': { tr: 'İlgili Mevzuat:', en: 'Related to:' },
   'search.clear_related': { tr: 'İlişkiyi Kaldır', en: 'Clear Relation' },
+  'search.loading': { tr: 'Arama yapılıyor...', en: 'Searching...' },
   
   'auth.modal_title': { tr: 'Giriş Yap', en: 'Login' },
   'auth.email_label': { tr: 'E-posta Adresi', en: 'Email Address' },

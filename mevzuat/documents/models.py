@@ -315,3 +315,12 @@ class FlaggedDocument(models.Model):
     def __str__(self):
         return f"{self.document.title} {self.flagged_by} {self.flagged_at}"
 
+
+class SearchQueryEmbedding(models.Model):
+    query = models.TextField()
+    normalized_query = models.TextField(unique=True)
+    embedding = VectorField(dimensions=1536)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.query

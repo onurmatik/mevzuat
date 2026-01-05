@@ -40,10 +40,46 @@ export interface StatsData {
 
 const API_BASE = '/api';
 
-async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${endpoint}`, options);
+// Helper to get cookie by name
+function getCookie(name: string): string | null {
+  if (!document.cookie) {
+    return null;
+  }
+  const xsrfCookies = document.cookie
+    .split(';')
+    .map(c => c.trim())
+    .filter(c => c.startsWith(name + '='));
+
+  if (xsrfCookies.length === 0) {
+    return null;
+  }
+  return decodeURIComponent(xsrfCookies[0].split('=')[1]);
+}
+
+async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+
+  // Add CSRF token if available
+  const csrftoken = getCookie('csrftoken');
+  if (csrftoken) {
+    (headers as any)['X-CSRFToken'] = csrftoken;
+  }
+
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    ...options,
+    headers,
+  });
   if (!response.ok) {
-    throw new Error(`API Error: ${response.statusText}`);
+    // Try to parse error message
+    let errMsg = response.statusText;
+    try {
+      const errData = await response.json();
+      if (errData.message) errMsg = errData.message;
+    } catch (e) { }
+    throw new Error(`API Error ${response.status}: ${errMsg}`);
   }
   return response.json();
 }
@@ -68,6 +104,12 @@ export const api = {
 
   async summarizeDocument(uuid: string): Promise<{ summary: string }> {
     return fetchApi<{ summary: string }>(`/documents/${uuid}/summarize`, {
+      method: 'POST'
+    });
+  },
+
+  async flagDocument(uuid: string): Promise<{ success: boolean }> {
+    return fetchApi<{ success: boolean }>(`/documents/${uuid}/flag`, {
       method: 'POST'
     });
   },

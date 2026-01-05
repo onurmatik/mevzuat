@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Search, ArrowRight, ArrowUpRight, BarChart3, Calendar } from 'lucide-react';
 import { api, Document, StatsData } from '../lib/api';
 import { DocumentCard } from '../components/DocumentCard';
@@ -14,6 +14,8 @@ export default function Home() {
   const [stats, setStats] = useState<StatsData[]>([]); // Need to update StatsChart to handle this data format later
   const { t } = useLanguage();
   const [timeRange, setTimeRange] = useState<TimeRange>('30days');
+  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     async function loadData() {
@@ -75,22 +77,32 @@ export default function Home() {
           </p>
 
           <div className="max-w-2xl mx-auto relative group">
-            <div className="relative">
+            <form
+              className="relative"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const trimmed = searchQuery.trim();
+                const params = trimmed ? `?q=${encodeURIComponent(trimmed)}` : '';
+                navigate(`/search${params}`);
+              }}
+            >
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground h-5 w-5" />
               <input
                 type="text"
                 placeholder={t('hero.search_placeholder')}
                 className="w-full h-14 pl-12 pr-4 bg-background border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-ring focus:border-input transition-all text-base"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                <Link
-                  to="/search"
+                <button
+                  type="submit"
                   className="bg-primary text-primary-foreground h-10 px-6 rounded-md text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors"
                 >
                   {t('hero.search_action')}
-                </Link>
+                </button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       </section>

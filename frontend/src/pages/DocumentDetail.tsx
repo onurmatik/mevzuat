@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Markdown from 'react-markdown';
-import { ArrowLeft, Share2, Printer, Download, Clock, Hash, FileText, ArrowUpRight, BookOpen, Scale } from 'lucide-react';
+import { ArrowLeft, Share2, Printer, Download, Clock, Hash, FileText, ArrowUpRight, BookOpen, Scale, Flag } from 'lucide-react';
 import { DOC_TYPE_LABELS } from '../data/mock'; // Keep labels for now, or fetch from API types? Labes are translation maps. api returns strings.
 // Actually api returns slug. We need to map slug to label. DOC_TYPE_LABELS has keys like 'law', 'khk'.
 // I should probably move DOC_TYPE_LABELS to a shared config or fetch types from API.
 // For now, I'll keep using mock labels if slugs match.
 import { useLanguage } from '../store/language';
+import { useAuth } from '../store/auth';
 import { api, Document } from '../lib/api';
 import { cn } from '../lib/utils';
 
@@ -15,6 +16,8 @@ export default function DocumentDetail() {
   const [doc, setDoc] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
   const [relatedDocs, setRelatedDocs] = useState<Document[]>([]);
+  const { isAuthenticated, user } = useAuth();
+  const [flagging, setFlagging] = useState(false);
 
   const { t, language } = useLanguage();
 
@@ -41,6 +44,22 @@ export default function DocumentDetail() {
     }
     load();
   }, [id]);
+
+  const handleFlag = async () => {
+    if (!doc || !isAuthenticated) return;
+    if (!confirm("Are you sure you want to flag this document as problematic?")) return;
+
+    setFlagging(true);
+    try {
+      await api.flagDocument(doc.uuid);
+      alert("Document flagged successfully. Thank you for your feedback.");
+    } catch (e) {
+      console.error("Flag failed", e);
+      alert("Failed to flag document.");
+    } finally {
+      setFlagging(false);
+    }
+  };
 
 
 
@@ -85,6 +104,16 @@ export default function DocumentDetail() {
             <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors" title="Share">
               <Share2 size={16} />
             </button>
+            {isAuthenticated && (
+              <button
+                onClick={handleFlag}
+                disabled={flagging}
+                className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                title="Flag as Problematic"
+              >
+                <Flag size={16} />
+              </button>
+            )}
             <div className="w-px h-4 bg-border mx-1"></div>
             <button className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-md hover:bg-primary/90 transition-colors">
               <Download size={14} />

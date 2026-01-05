@@ -11,7 +11,8 @@ export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const relatedToId = searchParams.get('related_to');
 
-  const [query, setQuery] = useState('');
+  const queryParam = searchParams.get('q');
+  const [query, setQuery] = useState(queryParam ?? '');
   const [selectedType, setSelectedType] = useState<string | 'all'>('all');
   const [dateRange, setDateRange] = useState<'all' | 'last-30' | 'last-year' | 'custom'>('all');
   const [customStartDate, setCustomStartDate] = useState('');
@@ -44,8 +45,14 @@ export default function SearchPage() {
     fetchRelated();
   }, [relatedToId]);
 
+  useEffect(() => {
+    if (queryParam !== null && queryParam !== query) {
+      setQuery(queryParam);
+    }
+  }, [queryParam, query]);
+
   const [docs, setDocs] = useState<Document[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
 
   useEffect(() => {
@@ -300,7 +307,16 @@ export default function SearchPage() {
               </button>
             </div>
 
-            {filteredDocs.length > 0 ? (
+            {loading ? (
+              <div
+                className="text-center py-24 bg-muted/20 rounded-lg border border-dashed border-border"
+                role="status"
+                aria-live="polite"
+              >
+                <div className="h-10 w-10 rounded-full border-2 border-primary/20 border-t-primary animate-spin mx-auto mb-3" />
+                <p className="text-sm font-medium text-muted-foreground">{t('search.loading')}</p>
+              </div>
+            ) : filteredDocs.length > 0 ? (
               <div className="flex flex-col gap-4">
                 {filteredDocs.map((doc) => (
                   <DocumentCard key={doc.id} doc={doc} />

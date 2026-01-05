@@ -1,8 +1,10 @@
 from typing import Optional, Any, List
 from uuid import UUID
 from datetime import date as dt_date
+import re
 
 from django.utils import timezone
+from django.db import IntegrityError
 from django.db.models import Count, Min, IntegerField, DateField
 from django.db.models.functions import ExtractYear, Cast, Coalesce, TruncDay, TruncMonth, TruncYear
 from django.shortcuts import get_object_or_404
@@ -12,9 +14,28 @@ from ninja.errors import HttpError
 from ninja.params import Query
 from openai import OpenAI
 
-from mevzuat.documents.models import Document, DocumentType
+from mevzuat.documents.models import Document, DocumentType, FlaggedDocument, SearchQueryEmbedding
+from ninja.security import django_auth
 
 router = Router()
+QUERY_NORMALIZE_RE = re.compile(r"\s+")
+
+
+def normalize_query(query: str) -> str:
+    return QUERY_NORMALIZE_RE.sub(" ", query).strip()
+
+
+@router.post("/{uuid}/flag", auth=django_auth)
+def flag_document(request, uuid: UUID):
+    if not request.user.is_authenticated:
+        return 401, {"success": False, "message": "Unauthorized"}
+    
+    doc = get_object_or_404(Document, uuid=uuid)
+    FlaggedDocument.objects.get_or_create(
+        document=doc,
+        flagged_by=request.user
+    )
+    return {"success": True}
 
 
 class DocumentOut(Schema):
@@ -78,14 +99,43 @@ def search_documents(
     """
     from pgvector.django import CosineDistance
 
-    # Generate query embedding
-    client = OpenAI()
-    response = client.embeddings.create(
-        model="text-embedding-3-small",
-        input=query,
-        dimensions=1536
+    normalized_query = normalize_query(query)
+    cached_query = (
+        SearchQueryEmbedding.objects
+        .filter(normalized_query=normalized_query)
+        .only("embedding")
+        .first()
     )
-    query_embedding = response.data[0].embedding
+    if cached_query and cached_query.embedding is not None:
+        query_embedding = cached_query.embedding
+    else:
+        client = OpenAI()
+        response = client.embeddings.create(
+            model="text-embedding-3-small",
+            input=normalized_query,
+            dimensions=1536
+        )
+        query_embedding = response.data[0].embedding
+        try:
+            SearchQueryEmbedding.objects.create(
+                query=normalized_query,
+                normalized_query=normalized_query,
+                embedding=query_embedding,
+            )
+        except IntegrityError:
+            existing_query = (
+                SearchQueryEmbedding.objects
+                .filter(normalized_query=normalized_query)
+                .only("embedding")
+                .first()
+            )
+            if existing_query and existing_query.embedding is not None:
+                query_embedding = existing_query.embedding
+            else:
+                SearchQueryEmbedding.objects.filter(normalized_query=normalized_query).update(
+                    query=normalized_query,
+                    embedding=query_embedding,
+                )
 
     # Build queryset with filters - only include documents with embeddings
     qs = Document.objects.exclude(embedding__isnull=True).select_related("type")
@@ -318,5 +368,4 @@ def translate_document(request, document_uuid: UUID):
         raise HttpError(400, str(e))
     except Exception as e:
         raise HttpError(500, f"Error translating document: {str(e)}")
-
 

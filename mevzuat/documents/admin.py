@@ -1,12 +1,19 @@
 from django.contrib import admin, messages
 from django.db.models import Q
-from .models import Document, DocumentType
+from .models import Document, DocumentType, FlaggedDocument
 
 
 @admin.register(DocumentType)
 class DocumentTypeAdmin(admin.ModelAdmin):
     list_display = ('name', 'short_name', 'slug', 'active', 'fetcher', 'document_count')
     list_editable = ('fetcher', 'active')
+
+
+@admin.register(FlaggedDocument)
+class FlaggedDocumentAdmin(admin.ModelAdmin):
+    list_display = ("document", "flagged_by", "flagged_at")
+    list_filter = ("flagged_at", "flagged_by")
+    search_fields = ("document__title", "flagged_by__username")
 
 
 class HasPdfFilter(admin.SimpleListFilter):
@@ -236,7 +243,7 @@ class DocumentAdmin(admin.ModelAdmin):
         return obj.metadata.get("mevzuatTur")
 
     def md_length(self, obj):
-        return len(obj.markdown)
+        return obj.markdown and len(obj.markdown) or '-'
 
     @admin.display(boolean=True, description="Has pdf?", ordering="document")
     def has_pdf(self, obj: Document) -> bool:
