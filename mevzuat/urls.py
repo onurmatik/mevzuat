@@ -3,7 +3,6 @@ from django.urls import path
 from ninja import NinjaAPI
 from mevzuat.api.api_documents import router as documents_router
 from mevzuat.api.api_auth import router as auth_router
-from mevzuat.documents import views as documents_views
 from mevzuat.documents.feeds import LatestDocumentsFeed
 
 
@@ -15,13 +14,6 @@ api.add_router("/documents", documents_router)
 urlpatterns = [
     path('mAdmin/', admin.site.urls),
     path("api/", api.urls),
-    path("", documents_views.main, name="home"),
-    path(
-        "documents/<uuid:document_uuid>/",
-        documents_views.document_detail,
-        name="document_detail",
-    ),
-    path("search/", documents_views.search, name="search"),
     path("rss/latest/", LatestDocumentsFeed(), name="latest_documents_feed"),
 ]
 
