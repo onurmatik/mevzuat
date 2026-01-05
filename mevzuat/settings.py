@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
+    'sesame',
     'mevzuat.documents',
 ]
 
@@ -122,6 +123,11 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+AUTHENTICATION_BACKENDS = [
+    'sesame.backends.ModelBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
@@ -178,6 +184,14 @@ else:
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
+
+FRONTEND_URL = os.getenv("FRONTEND_URL", "")
+MAGIC_LINK_REDIRECT_URL = os.getenv("MAGIC_LINK_REDIRECT_URL", "")
+SESAME_MAX_AGE = int(os.getenv("SESAME_MAX_AGE", "3600"))
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@mevzuat.info")
+
+if DEBUG:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 
 # Default primary key field type

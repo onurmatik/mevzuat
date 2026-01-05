@@ -10,7 +10,7 @@ interface User {
 interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
-  login: (email: string, password?: string) => void;
+  login: (email: string) => Promise<void>;
   logout: () => void;
   upgradeToPro: () => void;
   isAuthModalOpen: boolean;
@@ -47,37 +47,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const login = async (email: string, password?: string) => { // Updated signature to accept password
-    // For demo/prototype, we are just passing username as email if password not provided?
-    // The LoginModal likely provides both.
-    // Ideally I should update `login` signature in context but it breaks other calls if mismatched.
-    // The `login` in context definition currently takes `(email: string)`.
-    // I need to update interface `AuthContextType` too.
-
-    // For now assuming the simple `login(email)` meant "login with email only" which is insecure.
-    // But since backend requires password...
-    // I'll update the Context interface.
-    // But I can't update usages if I don't see them. LoginModal uses it.
-    // I'll leave the signature for now and try to login assuming defaults or ask user?
-    // Actually, I should probably update `LoginModal` too if I want real login.
-    // But for this task, I'll update `login` to accept `password` optional.
-
+  const login = async (email: string) => {
     try {
-      const res = await fetch('/api/auth/login', {
+      await fetch('/api/auth/magic-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: email, password: password || 'admin' }) // Default pwd for dev?
+        body: JSON.stringify({ email, redirect: window.location.href })
       });
-      if (res.ok) {
-        const data = await res.json();
-        setUser({ email: data.user.email, name: data.user.username });
-        setIsAuthModalOpen(false);
-      } else {
-        alert("Login failed");
-      }
     } catch (e) {
-      console.error("Login error", e);
-      alert("Login error");
+      console.error("Magic link request failed", e);
     }
   };
 

@@ -53,8 +53,10 @@ const translations: Record<string, Record<Language, string>> = {
   'search.loading': { tr: 'Arama yapılıyor...', en: 'Searching...' },
   
   'auth.modal_title': { tr: 'Giriş Yap', en: 'Login' },
+  'auth.continue_email': { tr: 'E-posta ile Devam Et', en: 'Continue with Email' },
   'auth.email_label': { tr: 'E-posta Adresi', en: 'Email Address' },
   'auth.submit': { tr: 'Sihirli Link Gönder', en: 'Send Magic Link' },
+  'auth.sending': { tr: 'Link Gönderiliyor...', en: 'Sending Link...' },
   'auth.sent': { tr: 'Link Gönderildi!', en: 'Link Sent!' },
   'auth.check_email': { tr: 'Lütfen e-posta kutunuzu kontrol edin.', en: 'Please check your inbox.' },
   

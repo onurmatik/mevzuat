@@ -124,6 +124,9 @@ class Document(models.Model):
         merged = {**self.metadata, **(extra or {})}
         return merged
 
+    def number(self):
+        return self.metadata["mevzuatNo"]
+
     def fetch_and_store_document(self, overwrite=False):
         return self._fetcher().fetch_and_store_document(self, overwrite=overwrite)
 
@@ -234,6 +237,7 @@ class Document(models.Model):
                                "Write a neutral, factual statement with no added context. "
                                "Exclude all formal and administrative details "
                                "(such as dates, numbers, signatures, authorities, and legal references). "
+                               "Do not use any markdown formatting; just plain sentences. "
                 },
                 {
                     "role": "user",

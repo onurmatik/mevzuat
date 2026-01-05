@@ -8,6 +8,7 @@ pgvector
 openai
 django-ninja
 django-storages
+django-sesame
 mcp
 fastmcp
 gunicorn

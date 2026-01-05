@@ -64,7 +64,7 @@ class DocumentOut(Schema):
 
     @staticmethod
     def resolve_number(obj):
-        return obj.metadata.get("MevzuatNo")
+        return obj.number()
 
     @staticmethod
     def resolve_type(obj):
@@ -368,4 +368,3 @@ def translate_document(request, document_uuid: UUID):
         raise HttpError(400, str(e))
     except Exception as e:
         raise HttpError(500, f"Error translating document: {str(e)}")
-
