@@ -8,6 +8,7 @@ python-slugify
 psycopg2-binary
 pgvector
 openai
+python-dotenv
 
 # do not process docs on web server
 # docling
