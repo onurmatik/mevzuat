@@ -71,7 +71,30 @@ def build_body(parameters: dict):
     }
 
 
-def fetch_documents(parameters: dict, *, page_size: int = 100, timeout: int = 30) -> list[dict]:
+def _summarize_row(row: dict) -> dict:
+    def pick(*keys):
+        for key in keys:
+            if key in row and row[key] not in (None, ""):
+                return row[key]
+        return None
+
+    return {
+        "mevzuat_no": pick("mevzuatNo", "MevzuatNo"),
+        "mevzuat_tertip": pick("mevzuatTertip", "MevzuatTertip"),
+        "mevzuat_tur": pick("mevzuatTur", "MevzuatTur"),
+        "resmi_gazete_tarihi": pick("resmiGazeteTarihi", "ResmiGazeteTarihi"),
+        "title": pick("mevAdi", "MevAdi", "title", "Title"),
+    }
+
+
+def fetch_documents(
+    parameters: dict,
+    *,
+    page_size: int = 100,
+    start: int = 0,
+    timeout: int = 30,
+    verbose: bool = False,
+) -> list[dict]:
     """Fetch the first page of documents for the given request parameters.
 
     Parameters
@@ -94,12 +117,23 @@ def fetch_documents(parameters: dict, *, page_size: int = 100, timeout: int = 30
     session, anti_token = bootstrap_session(timeout=timeout)
     params = {**parameters, "antiforgerytoken": anti_token}
     body = build_body(params)
-    body.update({"draw": 1, "start": 0, "length": page_size})
+    body.update({"draw": 1, "start": start, "length": page_size})
 
     resp = session.post(URL, headers=BASE_HEADERS, json=body, timeout=timeout)
     resp.raise_for_status()
     data = resp.json()
-    return data.get("data", [])
+    rows = data.get("data", [])
+    if verbose:
+        print(
+            f"[scraper] start={start} size={page_size} "
+            f"records_total={data.get('recordsTotal')} "
+            f"records_filtered={data.get('recordsFiltered')} "
+            f"returned={len(rows)}"
+        )
+        if rows:
+            print(f"[scraper] first_row={_summarize_row(rows[0])}")
+            print(f"[scraper] last_row={_summarize_row(rows[-1])}")
+    return rows
 
 
 def fetch_first_page(mevzuat_tur: str, page_size: int, outfile: Path, extra_params: dict | None = None):

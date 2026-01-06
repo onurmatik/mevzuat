@@ -5,8 +5,9 @@ import re
 
 from django.utils import timezone
 from django.db import IntegrityError
-from django.db.models import Count, Min, IntegerField, DateField
-from django.db.models.functions import ExtractYear, Cast, Coalesce, TruncDay, TruncMonth, TruncYear
+from django.db.models import Count, IntegerField, Value
+from django.db.models.functions import Cast, Coalesce, TruncDay, TruncMonth, TruncYear
+from django.db.models.fields.json import KeyTextTransform
 from django.shortcuts import get_object_or_404
 from pydantic import Field
 from ninja import Router, Schema
@@ -358,8 +359,15 @@ def list_documents(
     # exclude null dates and types
     qs = qs.exclude(date__isnull=True).exclude(date__isnull=True)
 
-    match_count = qs.count()
-    qs = qs.order_by("-date", "-id")
+    mevzuat_no_num = Coalesce(
+        Cast(KeyTextTransform("mevzuatNo", "metadata"), IntegerField()),
+        Value(0),
+    )
+    qs = qs.annotate(mevzuat_no_num=mevzuat_no_num).order_by(
+        "-date",
+        "-mevzuat_no_num",
+        "-id",
+    )
 
     # Hard limit of 100 if user asks for more, default 10
     limit = min(limit, 100)
