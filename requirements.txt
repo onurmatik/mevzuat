@@ -8,7 +8,9 @@ python-slugify
 psycopg2-binary
 pgvector
 openai
-docling
+
+# do not process docs on web server
+# docling
 
 # for deployment
 gunicorn
