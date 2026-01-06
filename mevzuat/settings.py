@@ -14,7 +14,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-8cw96g!9*h9vb!*&rcq_ux+$%(@k65o*hj99_k%(e8rcevvvmb'
+SECRET_KEY = os.getenv(
+    "DJANGO_SECRET_KEY",
+    os.getenv("SECRET_KEY", "django-insecure-8cw96g!9*h9vb!*&rcq_ux+$%(@k65o*hj99_k%(e8rcevvvmb"),
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG') == 'True'
@@ -145,6 +148,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
+AWS_REGION = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", ""))
 
 if AWS_STORAGE_BUCKET_NAME:
     STORAGES = {
@@ -165,7 +169,11 @@ if AWS_STORAGE_BUCKET_NAME:
         },
     }
 
-    AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
+    if AWS_REGION and AWS_REGION != "us-east-1":
+        AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com"
+    else:
+        AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
+    AWS_S3_REGION_NAME = AWS_REGION or None
     STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/static/"
     MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/docs/"
 
@@ -190,8 +198,13 @@ MAGIC_LINK_REDIRECT_URL = os.getenv("MAGIC_LINK_REDIRECT_URL", "")
 SESAME_MAX_AGE = int(os.getenv("SESAME_MAX_AGE", "3600"))
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@mevzuat.info")
 
-if DEBUG:
-    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND")
+if not EMAIL_BACKEND:
+    EMAIL_BACKEND = (
+        "django.core.mail.backends.console.EmailBackend"
+        if DEBUG
+        else "django.core.mail.backends.smtp.EmailBackend"
+    )
 
 
 # Default primary key field type

@@ -1,15 +1,16 @@
-fabric
 boto3
-aws-cdk-lib
-django
+django==5.2
+django-storages
+django-ses[events]
+django-ninja
+django-sesame
 python-slugify
 psycopg2-binary
 pgvector
 openai
-django-ninja
-django-storages
-django-sesame
-mcp
-fastmcp
-gunicorn
 docling
+
+# for deployment
+gunicorn
+fabric
+PyJWT
