@@ -1,5 +1,8 @@
 from django.contrib import admin, messages
-from django.db.models import Q
+from django.db import connection
+from django.db.models import Q, IntegerField, Value
+from django.db.models.fields.json import KeyTextTransform
+from django.db.models.functions import Cast, Coalesce
 from .models import Document, DocumentType, FlaggedDocument
 
 
@@ -232,6 +235,24 @@ class DocumentAdmin(admin.ModelAdmin):
         "summarize_documents",
         "translate_documents",
     )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.GET.get("o"):
+            return qs
+        if connection.vendor != "postgresql":
+            return qs.order_by("-date", "-id")
+
+        mevzuat_no_text = KeyTextTransform("mevzuatNo", "metadata")
+        mevzuat_no_num = Coalesce(
+            Cast(mevzuat_no_text, IntegerField()),
+            Value(0),
+        )
+        return qs.annotate(mevzuat_no_num=mevzuat_no_num).order_by(
+            "-date",
+            "-mevzuat_no_num",
+            "-id",
+        )
 
     def mevzuat_no(self, obj):
         return obj.metadata.get("mevzuatNo")
