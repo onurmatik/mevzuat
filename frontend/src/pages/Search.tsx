@@ -72,30 +72,14 @@ export default function SearchPage() {
         if (dateRange === 'custom' && customStartDate) filters.start_date = customStartDate;
         if (dateRange === 'custom' && customEndDate) filters.end_date = customEndDate;
 
-        // If query is empty, use listDocuments, else searchDocuments
+        if (relatedToId) {
+          filters.related_to = relatedToId;
+        }
+
+        const shouldSearch = Boolean(query) || Boolean(relatedToId);
         let results: Document[] = [];
-        if (!query && Object.keys(filters).length === 0) {
-          // Default list recent
-          results = await api.listDocuments({ limit: 20 });
-          // listDocuments returns Document[], but api.py logic for list doesn't limit?
-          // Wait, I should implement limit or rely on default.
-          // Let's use search with empty query if list logic is weak.
-          // Actually `search_documents` implementation handles empty type/filters?
-          // `search_documents` requires `query` param.
-          // `list_documents` filters by type/date.
-          // If query is empty, use listDocuments.
-          // But filtering by type is supported in listDocuments.
-          // The client logic here combines them.
-          results = await api.listDocuments(filters);
-        } else if (!query) {
-          results = await api.listDocuments(filters);
-        } else {
-          // Search API
-          const response = await api.searchDocuments(query, filters);
-          // Map search results to Document interface if structure differs
-          // SearchResult has text/filename/attributes.
-          // Document has title/type/date/content.
-          // Start mapping:
+        if (shouldSearch) {
+          const response = await api.searchDocuments(query || undefined, filters);
           results = response.data.map(r => ({
             id: r.attributes.id || 0,
             uuid: r.attributes.uuid || '',
@@ -106,6 +90,8 @@ export default function SearchPage() {
             type: r.type,
             date: r.attributes.date || null
           }));
+        } else {
+          results = await api.listDocuments(filters);
         }
         setDocs(results);
       } catch (e) {

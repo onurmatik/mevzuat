@@ -84,7 +84,8 @@ class DocumentTypeOut(Schema):
 @router.get("/search")
 def search_documents(
     request,
-    query: str = Query(..., description="Search query"),
+    query: Optional[str] = Query(None, description="Search query"),
+    related_to: Optional[UUID] = Query(None, description="Related document UUID"),
     type: Optional[str] = Query(None, description="Document type slug"),
     start_date: Optional[dt_date] = Query(None),
     end_date: Optional[dt_date] = Query(None),
@@ -93,52 +94,88 @@ def search_documents(
 ):
     """Search documents using local pgvector similarity search.
 
-    ``query`` is required. The query is converted to an embedding vector
+    ``query`` is optional if ``related_to`` is supplied. The query is converted to an embedding vector
     and compared against document embeddings using cosine similarity.
     Optional parameters allow filtering by document type and date ranges.
     """
     from pgvector.django import CosineDistance
 
-    normalized_query = normalize_query(query)
-    cached_query = (
-        SearchQueryEmbedding.objects
-        .filter(normalized_query=normalized_query)
-        .only("embedding")
-        .first()
-    )
-    if cached_query and cached_query.embedding is not None:
-        query_embedding = cached_query.embedding
-    else:
-        client = OpenAI()
-        response = client.embeddings.create(
-            model="text-embedding-3-small",
-            input=normalized_query,
-            dimensions=1536
-        )
-        query_embedding = response.data[0].embedding
-        try:
-            SearchQueryEmbedding.objects.create(
-                query=normalized_query,
-                normalized_query=normalized_query,
-                embedding=query_embedding,
-            )
-        except IntegrityError:
-            existing_query = (
+    related_doc = None
+    if related_to:
+        related_doc = get_object_or_404(Document, uuid=related_to)
+
+    query_embedding = None
+    if query:
+        normalized_query = normalize_query(query)
+        if normalized_query:
+            cached_query = (
                 SearchQueryEmbedding.objects
                 .filter(normalized_query=normalized_query)
                 .only("embedding")
                 .first()
             )
-            if existing_query and existing_query.embedding is not None:
-                query_embedding = existing_query.embedding
+            if cached_query and cached_query.embedding is not None:
+                query_embedding = cached_query.embedding
             else:
-                SearchQueryEmbedding.objects.filter(normalized_query=normalized_query).update(
-                    query=normalized_query,
-                    embedding=query_embedding,
+                client = OpenAI()
+                response = client.embeddings.create(
+                    model="text-embedding-3-small",
+                    input=normalized_query,
+                    dimensions=1536
                 )
+                query_embedding = response.data[0].embedding
+                try:
+                    SearchQueryEmbedding.objects.create(
+                        query=normalized_query,
+                        normalized_query=normalized_query,
+                        embedding=query_embedding,
+                    )
+                except IntegrityError:
+                    existing_query = (
+                        SearchQueryEmbedding.objects
+                        .filter(normalized_query=normalized_query)
+                        .only("embedding")
+                        .first()
+                    )
+                    if existing_query and existing_query.embedding is not None:
+                        query_embedding = existing_query.embedding
+                    else:
+                        SearchQueryEmbedding.objects.filter(normalized_query=normalized_query).update(
+                            query=normalized_query,
+                            embedding=query_embedding,
+                        )
+
+    related_embedding = None
+    if related_doc:
+        if related_doc.embedding is not None:
+            related_embedding = related_doc.embedding
+        else:
+            seed_text = " ".join(part for part in [related_doc.title, related_doc.summary] if part)
+            if not seed_text.strip():
+                raise HttpError(400, "Related document has no content to embed")
+            client = OpenAI()
+            response = client.embeddings.create(
+                model="text-embedding-3-small",
+                input=seed_text,
+                dimensions=1536
+            )
+            related_embedding = response.data[0].embedding
+
+    if query_embedding and related_embedding:
+        query_embedding = [
+            (left + right) / 2.0
+            for left, right in zip(query_embedding, related_embedding)
+        ]
+    elif related_embedding:
+        query_embedding = related_embedding
+
+    if query_embedding is None:
+        raise HttpError(400, "Search requires a query or related_to parameter")
 
     # Build queryset with filters - only include documents with embeddings
     qs = Document.objects.exclude(embedding__isnull=True).select_related("type")
+    if related_doc:
+        qs = qs.exclude(uuid=related_doc.uuid)
 
     if type:
         qs = qs.filter(type__slug=type)

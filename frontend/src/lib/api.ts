@@ -114,8 +114,11 @@ export const api = {
     });
   },
 
-  async searchDocuments(query: string, params?: Record<string, any>): Promise<SearchResponse> {
-    const searchParams = new URLSearchParams({ query });
+  async searchDocuments(query?: string, params?: Record<string, any>): Promise<SearchResponse> {
+    const searchParams = new URLSearchParams();
+    if (query) {
+      searchParams.append('query', query);
+    }
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
