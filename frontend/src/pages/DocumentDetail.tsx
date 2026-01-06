@@ -29,13 +29,20 @@ export default function DocumentDetail() {
         const d = await api.getDocument(id);
         setDoc(d);
 
-        // Mock related docs for now or implement API
-        // Using list with random or same type?
-        // The plan said "related_documents logic".
-        // I didn't verify backend implementation of related.
-        // I'll just list some recent docs as related for now to unblock.
-        const recent = await api.listDocuments({ limit: 3 });
-        setRelatedDocs(recent.filter(x => x.id !== d.id).slice(0, 3));
+        const related = await api.searchDocuments(undefined, {
+          related_to: d.uuid,
+          limit: 3
+        });
+        setRelatedDocs(related.data.map(r => ({
+          id: r.attributes.id || 0,
+          uuid: r.attributes.uuid || '',
+          title: r.attributes.title || r.filename,
+          content: null,
+          summary: null,
+          number: r.attributes.number || null,
+          type: r.type,
+          date: r.attributes.date || null
+        })));
       } catch (e) {
         console.error("Failed to load doc", e);
       } finally {
