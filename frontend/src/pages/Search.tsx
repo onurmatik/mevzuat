@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search as SearchIcon, Filter, Calendar, FileText, X, Bookmark, BookmarkCheck } from 'lucide-react';
-import { DOC_TYPE_LABELS, DocType } from '../data/mock';
+import { DOC_TYPE_LABELS, DocType } from '../data/documentTypes';
 import { DocumentCard } from '../components/DocumentCard';
 import { StatsChart } from '../components/StatsChart';
 import { useLanguage } from '../store/language';

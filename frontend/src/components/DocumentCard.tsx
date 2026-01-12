@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Hash, Calendar, FileText } from 'lucide-react';
 import { Document } from '../lib/api';
-import { DOC_TYPE_LABELS } from '../data/mock';
+import { DOC_TYPE_LABELS } from '../data/documentTypes';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../store/language';
 

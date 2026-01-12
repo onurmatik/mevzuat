@@ -80,16 +80,3 @@ export const MOCK_STATS_YEARLY = [
   { name: '2023', kanun: 55, khk: 14, cb_kararname: 28, cb_yonetmelik: 65, cb_karar: 38, cb_genelge: 22 },
   { name: '2024', kanun: 18, khk: 5, cb_kararname: 10, cb_yonetmelik: 20, cb_karar: 12, cb_genelge: 8 },
 ];
-
-export type DocType = 'kanun' | 'khk' | 'cb-kararname' | 'cb-yonetmelik' | 'cb-karar' | 'cb-genelge' | 'yonetmelik' | 'teblig';
-
-export const DOC_TYPE_LABELS = {
-  kanun: { tr: 'Kanun', en: 'Law' },
-  khk: { tr: 'KHK', en: 'Decree Law' },
-  'cb-kararname': { tr: 'CB Kararnamesi', en: 'Pres. Decree' },
-  'cb-yonetmelik': { tr: 'CB Yönetmeliği', en: 'Pres. Regulation' },
-  'cb-karar': { tr: 'CB Kararı', en: 'Pres. Decision' },
-  'cb-genelge': { tr: 'CB Genelgesi', en: 'Pres. Circular' },
-  yonetmelik: { tr: 'Yönetmelik', en: 'Regulation' },
-  teblig: { tr: 'Tebliğ', en: 'Communiqué' },
-};

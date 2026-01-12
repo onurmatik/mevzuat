@@ -2,10 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import { ArrowLeft, Share2, Printer, Download, Clock, Hash, FileText, ArrowUpRight, BookOpen, Scale, Flag } from 'lucide-react';
-import { DOC_TYPE_LABELS } from '../data/mock'; // Keep labels for now, or fetch from API types? Labes are translation maps. api returns strings.
-// Actually api returns slug. We need to map slug to label. DOC_TYPE_LABELS has keys like 'law', 'khk'.
-// I should probably move DOC_TYPE_LABELS to a shared config or fetch types from API.
-// For now, I'll keep using mock labels if slugs match.
+import { DOC_TYPE_LABELS } from '../data/documentTypes'; // Keep labels for now, or fetch from API types? Labels are translation maps. api returns strings.
 import { useLanguage } from '../store/language';
 import { useAuth } from '../store/auth';
 import { api, Document } from '../lib/api';

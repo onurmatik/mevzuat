@@ -1,5 +1,3 @@
-import { MOCK_DOCUMENTS } from '../data/mock';
-
 // Types derived from Backend DocumentOut schema
 export interface Document {
   id: number;
