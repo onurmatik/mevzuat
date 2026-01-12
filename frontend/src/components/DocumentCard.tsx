@@ -8,9 +8,10 @@ import { useLanguage } from '../store/language';
 
 interface DocumentCardProps {
   doc: Document;
+  onRelated?: (doc: Document) => void;
 }
 
-export function DocumentCard({ doc }: DocumentCardProps) {
+export function DocumentCard({ doc, onRelated }: DocumentCardProps) {
   const { language } = useLanguage();
   const typeKey = doc.type;
   const typeLabel = (DOC_TYPE_LABELS as any)[typeKey]?.[language] || doc.type;
@@ -19,7 +20,7 @@ export function DocumentCard({ doc }: DocumentCardProps) {
   return (
     <Link to={`/document/${doc.uuid}`} className="block group h-full">
       <article className="bg-card h-full rounded-lg border border-border p-5 hover:border-ring/50 hover:shadow-sm transition-all duration-200 flex flex-col">
-        <div className="flex justify-between items-start mb-4">
+        <div className="flex justify-between items-start mb-4 gap-3">
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-gray-500/10">
               {typeLabel}
@@ -28,6 +29,19 @@ export function DocumentCard({ doc }: DocumentCardProps) {
               <Hash size={12} />
               {numberLabel}
             </span>
+            {onRelated && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onRelated(doc);
+                }}
+                className="text-[10px] font-medium text-primary hover:text-primary/80 underline underline-offset-4"
+              >
+                Related
+              </button>
+            )}
           </div>
           <div className="flex items-center text-xs text-muted-foreground tabular-nums">
             <Calendar size={12} className="mr-1.5" />
@@ -42,6 +56,7 @@ export function DocumentCard({ doc }: DocumentCardProps) {
         <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed mb-4 flex-1">
           {doc.summary}
         </p>
+
       </article>
     </Link>
   );

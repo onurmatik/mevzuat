@@ -101,6 +101,12 @@ export default function SearchPage() {
     return statsData.reduce((sum, item) => sum + item.count, 0);
   }, [statsData]);
 
+  const handleRelatedFilter = useCallback((doc: Document) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('related_to', doc.uuid);
+    setSearchParams(newParams);
+  }, [searchParams, setSearchParams]);
+
   const handleChartSegmentClick = useCallback((info: { period: string; type: string; timeRange: '30days' | '12months' | 'all' }) => {
     let start = '';
     let end = '';
@@ -504,7 +510,7 @@ export default function SearchPage() {
             ) : filteredDocs.length > 0 ? (
               <div className="flex flex-col gap-4">
                 {filteredDocs.map((doc) => (
-                  <DocumentCard key={doc.id} doc={doc} />
+                  <DocumentCard key={doc.id} doc={doc} onRelated={handleRelatedFilter} />
                 ))}
                 {hasMore && (
                   <div className="flex justify-center pt-4">
