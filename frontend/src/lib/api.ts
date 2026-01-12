@@ -133,10 +133,22 @@ export const api = {
     return fetchApi<DocumentType[]>('/documents/types');
   },
 
-  async getStats(interval: 'day' | 'month' | 'year' = 'month', startDate?: string, endDate?: string): Promise<StatsData[]> {
+  async getStats(
+    interval: 'day' | 'month' | 'year' = 'month',
+    startDate?: string,
+    endDate?: string,
+    extraParams?: Record<string, any>
+  ): Promise<StatsData[]> {
     const params = new URLSearchParams({ interval });
     if (startDate) params.append('start_date', startDate);
     if (endDate) params.append('end_date', endDate);
+    if (extraParams) {
+      Object.entries(extraParams).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, String(value));
+        }
+      });
+    }
 
     return fetchApi<StatsData[]>(`/documents/counts?${params.toString()}`);
   }

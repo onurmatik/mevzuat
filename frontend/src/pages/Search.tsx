@@ -3,9 +3,10 @@ import { useSearchParams } from 'react-router-dom';
 import { Search as SearchIcon, Filter, Calendar, FileText, X, Bookmark, BookmarkCheck } from 'lucide-react';
 import { DOC_TYPE_LABELS, DocType } from '../data/mock';
 import { DocumentCard } from '../components/DocumentCard';
+import { StatsChart } from '../components/StatsChart';
 import { useLanguage } from '../store/language';
 import { useAuth } from '../store/auth';
-import { api, Document } from '../lib/api';
+import { api, Document, StatsData } from '../lib/api';
 
 export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -56,8 +57,49 @@ export default function SearchPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [offset, setOffset] = useState(0);
+  const [statsData, setStatsData] = useState<StatsData[]>([]);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   const PAGE_SIZE = 10;
+  const MIN_RELEVANCE_SCORE = 0.5;
+  const MAX_CHART_YEARS = 10;
+
+  const { chartTimeRange, chartRangeStart, chartRangeEnd } = useMemo(() => {
+    if (dateRange === 'last-30') {
+      return { chartTimeRange: '30days' as const, chartRangeStart: undefined, chartRangeEnd: undefined };
+    }
+    if (dateRange === 'last-year') {
+      return { chartTimeRange: '12months' as const, chartRangeStart: undefined, chartRangeEnd: undefined };
+    }
+    if (dateRange === 'custom' && (customStartDate || customEndDate)) {
+      if (customStartDate && customEndDate) {
+        const start = new Date(customStartDate);
+        const end = new Date(customEndDate);
+        if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+          const diffDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          if (diffDays <= 31) {
+            return { chartTimeRange: '30days' as const, chartRangeStart: customStartDate, chartRangeEnd: customEndDate };
+          }
+          if (diffDays <= 366) {
+            return { chartTimeRange: '12months' as const, chartRangeStart: customStartDate, chartRangeEnd: customEndDate };
+          }
+        }
+      }
+      return { chartTimeRange: 'all' as const, chartRangeStart: customStartDate || undefined, chartRangeEnd: customEndDate || undefined };
+    }
+    const end = new Date();
+    const startYear = end.getFullYear() - (MAX_CHART_YEARS - 1);
+    const start = new Date(startYear, 0, 1);
+    return {
+      chartTimeRange: 'all' as const,
+      chartRangeStart: start.toISOString().split('T')[0],
+      chartRangeEnd: end.toISOString().split('T')[0]
+    };
+  }, [dateRange, customStartDate, customEndDate]);
+
+  const statsTotal = useMemo(() => {
+    return statsData.reduce((sum, item) => sum + item.count, 0);
+  }, [statsData]);
 
   const buildFilters = () => {
     const filters: Record<string, any> = {};
@@ -80,6 +122,50 @@ export default function SearchPage() {
 
     return filters;
   };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStats() {
+      setStatsLoading(true);
+      try {
+        const filters = buildFilters();
+        const { start_date, end_date, ...restFilters } = filters;
+        let statsStartDate = start_date;
+        let statsEndDate = end_date;
+        if (!statsStartDate && !statsEndDate && chartRangeStart && chartRangeEnd && dateRange === 'all') {
+          statsStartDate = chartRangeStart;
+          statsEndDate = chartRangeEnd;
+        }
+        const statsParams: Record<string, any> = { ...restFilters };
+        if (query) statsParams.query = query;
+        if (relatedToId) statsParams.related_to = relatedToId;
+        if (query || relatedToId) statsParams.min_score = MIN_RELEVANCE_SCORE;
+
+        const interval =
+          chartTimeRange === '30days' ? 'day' : chartTimeRange === '12months' ? 'month' : 'year';
+
+        const data = await api.getStats(interval, statsStartDate, statsEndDate, statsParams);
+        if (!cancelled) {
+          setStatsData(data);
+        }
+      } catch (e) {
+        console.error("Failed to load stats", e);
+        if (!cancelled) {
+          setStatsData([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setStatsLoading(false);
+        }
+      }
+    }
+
+    loadStats();
+    return () => {
+      cancelled = true;
+    };
+  }, [query, selectedType, dateRange, customStartDate, customEndDate, relatedToId, chartTimeRange, chartRangeStart, chartRangeEnd]);
 
   useEffect(() => {
     setOffset(0);
@@ -280,6 +366,35 @@ export default function SearchPage() {
                         </div>
                       </div>
                     )}
+
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] uppercase text-muted-foreground font-semibold">
+                          Result Distribution
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {statsLoading ? '...' : statsTotal}
+                        </span>
+                      </div>
+                      <div className="h-40 bg-background border border-border rounded-lg p-2">
+                        {statsLoading ? (
+                          <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+                            Loading...
+                          </div>
+                        ) : statsData.length > 0 ? (
+                          <StatsChart
+                            timeRange={chartTimeRange}
+                            data={statsData}
+                            rangeStart={chartRangeStart}
+                            rangeEnd={chartRangeEnd}
+                          />
+                        ) : (
+                          <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+                            No results to chart
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

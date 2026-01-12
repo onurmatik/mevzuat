@@ -8,48 +8,35 @@ import { useLanguage } from '../store/language';
 interface StatsChartProps {
   timeRange?: '30days' | '12months' | 'all';
   data?: StatsData[];
+  rangeStart?: string;
+  rangeEnd?: string;
 }
 
 
 
-export function StatsChart({ timeRange = '30days', data: apiData }: StatsChartProps) {
+export function StatsChart({
+  timeRange = '30days',
+  data: apiData,
+  rangeStart,
+  rangeEnd
+}: StatsChartProps) {
   const { language } = useLanguage();
 
   // Transform API data if available
   const data = React.useMemo(() => {
     const grouped = new Map<string, any>();
-    const today = new Date();
+    const parsedEnd = rangeEnd ? parseISO(rangeEnd) : new Date();
+    const parsedStart = rangeStart ? parseISO(rangeStart) : null;
+    const hasValidStart = parsedStart && !Number.isNaN(parsedStart.getTime());
+    const hasValidEnd = !Number.isNaN(parsedEnd.getTime());
+    let rangeStartDate = hasValidStart ? parsedStart : null;
+    let rangeEndDate = hasValidEnd ? parsedEnd : new Date();
 
-    // Pre-fill the map based on timeRange
-    if (timeRange === '30days') {
-      for (let i = 29; i >= 0; i--) {
-        const d = new Date(today);
-        d.setDate(d.getDate() - i);
-        const key = d.toISOString().split('T')[0] + 'T00:00:00'; // Match API format roughly or just use ISO date part
-        // Actually API returns full ISO string like 2024-03-25T00:00:00
-        // Let's use a standard key format YYYY-MM-DD
-        const standardKey = format(d, 'yyyy-MM-dd');
-        grouped.set(standardKey, {
-          name: format(d, 'd MMM', { locale: language === 'tr' ? tr : enUS }),
-          originalDate: d
-        });
-      }
-    } else if (timeRange === '12months') {
-      for (let i = 11; i >= 0; i--) {
-        const d = new Date(today);
-        d.setMonth(d.getMonth() - i);
-        d.setDate(1); // normalized to first of month
-        const standardKey = format(d, 'yyyy-MM');
-        grouped.set(standardKey, {
-          name: format(d, 'MMM yy', { locale: language === 'tr' ? tr : enUS }),
-          originalDate: d
-        });
-      }
+    if (rangeStartDate && rangeStartDate > rangeEndDate) {
+      const temp = rangeStartDate;
+      rangeStartDate = rangeEndDate;
+      rangeEndDate = temp;
     }
-    // For 'all', we don't pre-fill because start date varies (1980), but we could fill gaps between min and max year if needed.
-    // For now, let's just process 'all' as is, or fill gaps if user insists.
-    // The user said "in charts, let it spare slots for empty dates too".
-    // For year view, it's better to fill years between min and max.
 
     const processedApiData = (apiData || []).map(item => {
       const date = parseISO(item.period);
@@ -60,10 +47,66 @@ export function StatsChart({ timeRange = '30days', data: apiData }: StatsChartPr
       return { ...item, key, date };
     });
 
+    // Pre-fill the map based on timeRange
+    if (timeRange === '30days') {
+      if (rangeStartDate) {
+        const cursor = new Date(rangeStartDate.getFullYear(), rangeStartDate.getMonth(), rangeStartDate.getDate());
+        const end = new Date(rangeEndDate.getFullYear(), rangeEndDate.getMonth(), rangeEndDate.getDate());
+        while (cursor <= end) {
+          const standardKey = format(cursor, 'yyyy-MM-dd');
+          grouped.set(standardKey, {
+            name: format(cursor, 'd MMM', { locale: language === 'tr' ? tr : enUS }),
+            originalDate: new Date(cursor)
+          });
+          cursor.setDate(cursor.getDate() + 1);
+        }
+      } else {
+        for (let i = 29; i >= 0; i--) {
+          const d = new Date(rangeEndDate);
+          d.setDate(d.getDate() - i);
+          const standardKey = format(d, 'yyyy-MM-dd');
+          grouped.set(standardKey, {
+            name: format(d, 'd MMM', { locale: language === 'tr' ? tr : enUS }),
+            originalDate: d
+          });
+        }
+      }
+    } else if (timeRange === '12months') {
+      if (rangeStartDate) {
+        const cursor = new Date(rangeStartDate.getFullYear(), rangeStartDate.getMonth(), 1);
+        const end = new Date(rangeEndDate.getFullYear(), rangeEndDate.getMonth(), 1);
+        while (cursor <= end) {
+          const standardKey = format(cursor, 'yyyy-MM');
+          grouped.set(standardKey, {
+            name: format(cursor, 'MMM yy', { locale: language === 'tr' ? tr : enUS }),
+            originalDate: new Date(cursor)
+          });
+          cursor.setMonth(cursor.getMonth() + 1);
+        }
+      } else {
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date(rangeEndDate);
+          d.setMonth(d.getMonth() - i);
+          d.setDate(1); // normalized to first of month
+          const standardKey = format(d, 'yyyy-MM');
+          grouped.set(standardKey, {
+            name: format(d, 'MMM yy', { locale: language === 'tr' ? tr : enUS }),
+            originalDate: d
+          });
+        }
+      }
+    }
+    // For 'all', we don't pre-fill because start date varies (1980), but we could fill gaps between min and max year if needed.
+    // For now, let's just process 'all' as is, or fill gaps if user insists.
+    // The user said "in charts, let it spare slots for empty dates too".
+    // For year view, it's better to fill years between min and max.
+
     // If 'all', find min/max and fill
     if (timeRange === 'all' && processedApiData.length > 0) {
-      const minYear = Math.min(...processedApiData.map(d => d.date.getFullYear()));
-      const maxYear = new Date().getFullYear();
+      const minYear = rangeStartDate
+        ? rangeStartDate.getFullYear()
+        : Math.min(...processedApiData.map(d => d.date.getFullYear()));
+      const maxYear = rangeEndDate.getFullYear();
       for (let y = minYear; y <= maxYear; y++) {
         const d = new Date(y, 0, 1);
         const key = String(y);
@@ -96,9 +139,8 @@ export function StatsChart({ timeRange = '30days', data: apiData }: StatsChartPr
     });
 
     return Array.from(grouped.values())
-    return Array.from(grouped.values())
       .sort((a, b) => a.originalDate.getTime() - b.originalDate.getTime());
-  }, [timeRange, apiData, language]);
+  }, [timeRange, apiData, language, rangeStart, rangeEnd]);
 
   return (
     <div className="w-full h-full">

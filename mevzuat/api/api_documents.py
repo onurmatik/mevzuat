@@ -26,6 +26,67 @@ def normalize_query(query: str) -> str:
     return QUERY_NORMALIZE_RE.sub(" ", query).strip()
 
 
+def resolve_query_embedding(query: Optional[str]) -> tuple[Optional[str], Optional[list[float]]]:
+    if not query:
+        return None, None
+    normalized_query = normalize_query(query)
+    if not normalized_query:
+        return None, None
+    cached_query = (
+        SearchQueryEmbedding.objects
+        .filter(normalized_query=normalized_query)
+        .only("embedding")
+        .first()
+    )
+    if cached_query and cached_query.embedding is not None:
+        return normalized_query, cached_query.embedding
+    client = OpenAI()
+    response = client.embeddings.create(
+        model="text-embedding-3-small",
+        input=normalized_query,
+        dimensions=1536
+    )
+    query_embedding = response.data[0].embedding
+    try:
+        SearchQueryEmbedding.objects.create(
+            query=normalized_query,
+            normalized_query=normalized_query,
+            embedding=query_embedding,
+        )
+    except IntegrityError:
+        existing_query = (
+            SearchQueryEmbedding.objects
+            .filter(normalized_query=normalized_query)
+            .only("embedding")
+            .first()
+        )
+        if existing_query and existing_query.embedding is not None:
+            query_embedding = existing_query.embedding
+        else:
+            SearchQueryEmbedding.objects.filter(normalized_query=normalized_query).update(
+                query=normalized_query,
+                embedding=query_embedding,
+            )
+    return normalized_query, query_embedding
+
+
+def resolve_related_embedding(related_doc: Optional[Document]) -> Optional[list[float]]:
+    if not related_doc:
+        return None
+    if related_doc.embedding is not None:
+        return related_doc.embedding
+    seed_text = " ".join(part for part in [related_doc.title, related_doc.summary] if part)
+    if not seed_text.strip():
+        raise HttpError(400, "Related document has no content to embed")
+    client = OpenAI()
+    response = client.embeddings.create(
+        model="text-embedding-3-small",
+        input=seed_text,
+        dimensions=1536
+    )
+    return response.data[0].embedding
+
+
 @router.post("/{uuid}/flag", auth=django_auth)
 def flag_document(request, uuid: UUID):
     if not request.user.is_authenticated:
@@ -105,62 +166,8 @@ def search_documents(
     if related_to:
         related_doc = get_object_or_404(Document, uuid=related_to)
 
-    query_embedding = None
-    if query:
-        normalized_query = normalize_query(query)
-        if normalized_query:
-            cached_query = (
-                SearchQueryEmbedding.objects
-                .filter(normalized_query=normalized_query)
-                .only("embedding")
-                .first()
-            )
-            if cached_query and cached_query.embedding is not None:
-                query_embedding = cached_query.embedding
-            else:
-                client = OpenAI()
-                response = client.embeddings.create(
-                    model="text-embedding-3-small",
-                    input=normalized_query,
-                    dimensions=1536
-                )
-                query_embedding = response.data[0].embedding
-                try:
-                    SearchQueryEmbedding.objects.create(
-                        query=normalized_query,
-                        normalized_query=normalized_query,
-                        embedding=query_embedding,
-                    )
-                except IntegrityError:
-                    existing_query = (
-                        SearchQueryEmbedding.objects
-                        .filter(normalized_query=normalized_query)
-                        .only("embedding")
-                        .first()
-                    )
-                    if existing_query and existing_query.embedding is not None:
-                        query_embedding = existing_query.embedding
-                    else:
-                        SearchQueryEmbedding.objects.filter(normalized_query=normalized_query).update(
-                            query=normalized_query,
-                            embedding=query_embedding,
-                        )
-
-    related_embedding = None
-    if related_doc:
-        if related_doc.embedding is not None:
-            related_embedding = related_doc.embedding
-        else:
-            seed_text = " ".join(part for part in [related_doc.title, related_doc.summary] if part)
-            if not seed_text.strip():
-                raise HttpError(400, "Related document has no content to embed")
-            client = OpenAI()
-            response = client.embeddings.create(
-                model="text-embedding-3-small",
-                input=seed_text,
-                dimensions=1536
-            )
-            related_embedding = response.data[0].embedding
+    _, query_embedding = resolve_query_embedding(query)
+    related_embedding = resolve_related_embedding(related_doc)
 
     if query_embedding is not None and related_embedding is not None:
         query_embedding = [
@@ -179,7 +186,10 @@ def search_documents(
         qs = qs.exclude(uuid=related_doc.uuid)
 
     if type:
-        qs = qs.filter(type__slug=type)
+        if type.isdigit():
+            qs = qs.filter(type_id=int(type))
+        else:
+            qs = qs.filter(type__slug=type)
     if start_date:
         qs = qs.filter(date__gte=start_date)
     if end_date:
@@ -238,9 +248,13 @@ def list_document_types(request):
 @router.get("/counts")
 def document_counts(
     request,
+    query: Optional[str] = Query(None, description="Search query"),
+    related_to: Optional[UUID] = Query(None, description="Related document UUID"),
+    type: Optional[str] = Query(None, description="Document type slug"),
     start_date: Optional[dt_date] = None,
     end_date: Optional[dt_date] = None,
     interval: str = "day",
+    min_score: float = Query(0.5, ge=-1, le=1),
 ) -> list[dict[str, Any]]:
     """
     Return document counts grouped by a time interval and type.
@@ -250,21 +264,62 @@ def document_counts(
     ``interval`` may be one of ``"day"``, ``"month"`` or ``"year"``.
     """
     from django.core.cache import cache
+    from pgvector.django import CosineDistance
 
     if interval not in {"day", "month", "year"}:
         raise HttpError(400, "``interval`` must be one of 'day', 'month' or 'year'")
 
+    related_doc = None
+    if related_to:
+        related_doc = get_object_or_404(Document, uuid=related_to)
+
+    normalized_query = normalize_query(query) if query else None
+    if normalized_query == "":
+        normalized_query = None
+
     # Build cache key from parameters
-    cache_key = f"doc_counts:{interval}:{start_date}:{end_date}"
+    cache_key = (
+        f"doc_counts:{interval}:{start_date}:{end_date}:"
+        f"{normalized_query}:{related_to}:{type}:{min_score}"
+    )
     cached_result = cache.get(cache_key)
     if cached_result is not None:
         return cached_result
 
+    query_embedding = None
+    if normalized_query:
+        _, query_embedding = resolve_query_embedding(query)
+    related_embedding = resolve_related_embedding(related_doc)
+
+    if query_embedding is not None and related_embedding is not None:
+        query_embedding = [
+            (left + right) / 2.0
+            for left, right in zip(query_embedding, related_embedding)
+        ]
+    elif related_embedding is not None:
+        query_embedding = related_embedding
+
     qs = Document.objects.all()
+    if type:
+        if type.isdigit():
+            qs = qs.filter(type_id=int(type))
+        else:
+            qs = qs.filter(type__slug=type)
+    if query_embedding is not None:
+        qs = qs.exclude(embedding__isnull=True)
+        if related_doc:
+            qs = qs.exclude(uuid=related_doc.uuid)
+        qs = qs.annotate(distance=CosineDistance("embedding", query_embedding))
+        qs = qs.filter(distance__lte=1 - min_score)
 
     # --- Default date boundaries ------------------------------------------------
     if start_date is None:
-        first_ts = qs.order_by("date").values_list("date", flat=True).first()
+        first_ts = (
+            qs.exclude(date__isnull=True)
+            .order_by("date")
+            .values_list("date", flat=True)
+            .first()
+        )
         # If there are no documents yet, default to today so we don't blow up later.
         start_date = first_ts if first_ts else timezone.now().date()
 
@@ -309,7 +364,7 @@ def document_counts(
 @router.get("/list", response=list[DocumentOut])
 def list_documents(
     request,
-    type: Optional[int] = Query(None, description="DocumentType ID"),
+    type: Optional[str] = Query(None, description="DocumentType ID or slug"),
     year: Optional[int] = Query(None, ge=1900),
     month: Optional[int] = Query(None, ge=1, le=12),
     date: Optional[dt_date] = Query(None),
@@ -341,7 +396,10 @@ def list_documents(
     qs = Document.objects.all()
 
     if type is not None:
-        qs = qs.filter(type_id=type)
+        if type.isdigit():
+            qs = qs.filter(type_id=int(type))
+        else:
+            qs = qs.filter(type__slug=type)
 
     # --- apply date filtering by precedence --------------------------------
     if date:
