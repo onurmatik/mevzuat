@@ -86,6 +86,7 @@ class Document(models.Model):
     summary = models.TextField(blank=True, null=True)
     summary_en = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
         title = self.metadata.get('mevAdi')
@@ -94,6 +95,11 @@ class Document(models.Model):
         effective_date = self.metadata.get('resmiGazeteTarihi')
         if effective_date:
             self.date = parse_date(effective_date)
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            update_fields = set(update_fields)
+            update_fields.add("modified_at")
+            kwargs["update_fields"] = update_fields
         super().save(*args, **kwargs)
 
     class Meta:
@@ -148,6 +154,9 @@ class Document(models.Model):
                 overwrite=True,
                 force_ocr=True,
             )
+        else:
+            self.markdown_status = None
+            self.save(update_fields=["markdown_status"])
 
         return markdown
 

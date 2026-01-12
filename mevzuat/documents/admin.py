@@ -1,9 +1,14 @@
+import logging
+import string
+
 from django.contrib import admin, messages
 from django.db import connection
 from django.db.models import Q, IntegerField, Value
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast, Coalesce
 from .models import Document, DocumentType, FlaggedDocument
+
+logger = logging.getLogger(__name__)
 
 
 @admin.register(DocumentType)
@@ -204,6 +209,7 @@ class DocumentAdmin(admin.ModelAdmin):
         "md_length",
         "date",
         "created_at",
+        "modified_at",
         "has_pdf",
         "has_md",
         "has_embedding",
@@ -214,6 +220,7 @@ class DocumentAdmin(admin.ModelAdmin):
     list_filter = (
         "type",
         "date",
+        "modified_at",
         MevzuatTurFilter,
         MevzuatTertipFilter,
         HasPdfFilter,
@@ -227,9 +234,10 @@ class DocumentAdmin(admin.ModelAdmin):
     search_fields = ("uuid", "metadata__mevzuat_no", "title")
     actions = (
         "fetch_document",
-        "convert_to_markdown",
+        # "convert_to_markdown",
         "convert_to_markdown_force_ocr",
         "check_markdown_health",
+        "mark_markdown_healthy",
         "set_file_sizes",
         "generate_embeddings",
         "summarize_documents",
@@ -364,19 +372,31 @@ class DocumentAdmin(admin.ModelAdmin):
         flagged = 0
         skipped = 0
         warning = getattr(Document, "MARKDOWN_STATUS_WARNING", "warning")
+        reason_counts = {}
         for obj in queryset:
             if not obj.markdown:
                 skipped += 1
                 continue
-            if obj.has_markdown_glyph_artifacts():
+            reasons = self._markdown_health_reasons(obj)
+            if reasons:
                 if obj.markdown_status != warning:
                     obj.markdown_status = warning
                     obj.save(update_fields=["markdown_status"])
                 flagged += 1
+                for reason in reasons:
+                    reason_counts[reason] = reason_counts.get(reason, 0) + 1
         if flagged:
+            reason_summary = ", ".join(
+                f"{reason}={count}"
+                for reason, count in sorted(
+                    reason_counts.items(),
+                    key=lambda item: (-item[1], item[0]),
+                )
+            )
+            detail = f" Reasons: {reason_summary}." if reason_summary else ""
             self.message_user(
                 request,
-                f"Marked {flagged} document(s) for markdown review due to glyph artifacts.",
+                f"Marked {flagged} document(s) for markdown review.{detail}",
                 level=messages.WARNING,
             )
         if skipped:
@@ -388,9 +408,132 @@ class DocumentAdmin(admin.ModelAdmin):
         if not flagged and not skipped:
             self.message_user(
                 request,
-                "Checked documents and found no glyph artifacts in markdown.",
+                "Checked documents and found no markdown health issues.",
                 level=messages.SUCCESS,
             )
+
+    def mark_markdown_healthy(self, request, queryset):
+        success_status = getattr(Document, "MARKDOWN_STATUS_SUCCESS", "success")
+        updated = 0
+        for obj in queryset:
+            if obj.markdown_status != success_status:
+                obj.markdown_status = success_status
+                obj.save(update_fields=["markdown_status"])
+                updated += 1
+        if updated:
+            self.message_user(
+                request,
+                f"Marked {updated} document(s) as markdown healthy.",
+                level=messages.SUCCESS,
+            )
+        else:
+            self.message_user(
+                request,
+                "Selected documents are already marked as healthy.",
+                level=messages.INFO,
+            )
+
+    def _markdown_health_reasons(self, obj):
+        text = obj.markdown or ""
+        text_len = len(text)
+        words = text.split()
+        word_count = len(words)
+        if word_count:
+            avg_word_len = sum(len(word) for word in words) / word_count
+            long_tokens = sum(1 for word in words if len(word) >= 30)
+            long_token_ratio = long_tokens / word_count
+        else:
+            avg_word_len = 0
+            long_token_ratio = 0
+
+        non_ws = sum(1 for ch in text if not ch.isspace())
+        alpha = sum(1 for ch in text if ch.isalpha())
+        alpha_ratio = alpha / non_ws if non_ws else 0
+
+        strip_chars = string.punctuation
+        connector_chars = "-/."
+        alpha_tokens = 0
+        mixed_alnum_tokens = 0
+        symbol_mixed_tokens = 0
+        other_tokens = 0
+
+        for token in words:
+            cleaned = token.strip(strip_chars)
+            if not cleaned:
+                continue
+            normalized = "".join(ch for ch in cleaned if ch not in connector_chars)
+            if not normalized:
+                continue
+            has_alpha = any(ch.isalpha() for ch in normalized)
+            has_digit = any(ch.isdigit() for ch in normalized)
+            has_other = any(not ch.isalnum() for ch in normalized)
+            if has_alpha and not has_digit and not has_other:
+                alpha_tokens += 1
+            elif has_alpha and has_digit:
+                mixed_alnum_tokens += 1
+            elif has_alpha and has_other:
+                symbol_mixed_tokens += 1
+            else:
+                other_tokens += 1
+
+        token_total = alpha_tokens + mixed_alnum_tokens + symbol_mixed_tokens + other_tokens
+        if token_total:
+            alpha_token_ratio = alpha_tokens / token_total
+            mixed_alnum_ratio = mixed_alnum_tokens / token_total
+            symbol_mixed_ratio = symbol_mixed_tokens / token_total
+        else:
+            alpha_token_ratio = 0
+            mixed_alnum_ratio = 0
+            symbol_mixed_ratio = 0
+
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        line_total = len(lines)
+        noisy_lines = 0
+        if line_total:
+            for line in lines:
+                non_ws_line = sum(1 for ch in line if not ch.isspace())
+                alpha_line = sum(1 for ch in line if ch.isalpha())
+                if non_ws_line >= 8 and alpha_line / non_ws_line < 0.3:
+                    noisy_lines += 1
+                elif non_ws_line <= 4 and alpha_line <= 1:
+                    noisy_lines += 1
+
+        pdf_size = obj.file_size
+        if not pdf_size and obj.document:
+            try:
+                pdf_size = obj.document.size
+            except Exception:  # pragma: no cover - defensive
+                pdf_size = None
+
+        reasons = []
+        if obj.has_markdown_glyph_artifacts():
+            reasons.append("glyph_artifacts")
+        if text.count("\ufffd") >= 5:
+            reasons.append("replacement_chars")
+        if text_len < 200 and (pdf_size is None or pdf_size >= 30_000):
+            reasons.append("too_short")
+        if pdf_size and pdf_size >= 200_000 and text_len < 1000:
+            reasons.append("short_for_pdf")
+        if pdf_size and text_len and pdf_size >= 50_000:
+            ratio = text_len / pdf_size
+            if ratio < 0.003:
+                reasons.append("low_md_pdf_ratio")
+        if non_ws >= 1000 and alpha_ratio < 0.25:
+            reasons.append("low_alpha_ratio")
+        if word_count >= 50 and avg_word_len > 20:
+            reasons.append("avg_word_len_high")
+        if word_count >= 100 and long_token_ratio > 0.1:
+            reasons.append("many_long_tokens")
+        if token_total >= 50 and alpha_token_ratio < 0.45:
+            reasons.append("low_alpha_token_ratio")
+        if token_total >= 50 and mixed_alnum_ratio > 0.08:
+            reasons.append("mixed_alnum_tokens")
+        if token_total >= 50 and symbol_mixed_ratio > 0.04:
+            reasons.append("alpha_symbol_tokens")
+        if line_total >= 20 and noisy_lines / line_total > 0.3:
+            reasons.append("noisy_lines")
+
+        return reasons
 
     def set_file_sizes(self, request, queryset):
         """Populate missing file_size for selected documents."""
@@ -441,7 +584,7 @@ class DocumentAdmin(admin.ModelAdmin):
                 skipped += 1
                 continue
             try:
-                obj.generate_embedding()
+                obj.generate_embedding(overwrite=True)
                 ok += 1
             except Exception as exc:  # pragma: no cover - defensive
                 errors.append((obj, exc))
@@ -474,6 +617,7 @@ class DocumentAdmin(admin.ModelAdmin):
                 skipped += 1
                 continue
             try:
+                logger.info("Summarizing document id=%s title=%s", obj.id, obj.title)
                 obj.summarize(overwrite=True)
                 ok += 1
             except Exception as exc:  # pragma: no cover - defensive
@@ -507,7 +651,8 @@ class DocumentAdmin(admin.ModelAdmin):
                 skipped += 1
                 continue
             try:
-                obj.translate()
+                logger.info("Translating document id=%s title=%s", obj.id, obj.title)
+                obj.translate(overwrite=True)
                 ok += 1
             except Exception as exc:  # pragma: no cover - defensive
                 errors.append((obj, exc))

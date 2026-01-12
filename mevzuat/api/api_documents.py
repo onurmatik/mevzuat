@@ -162,12 +162,12 @@ def search_documents(
             )
             related_embedding = response.data[0].embedding
 
-    if query_embedding and related_embedding:
+    if query_embedding is not None and related_embedding is not None:
         query_embedding = [
             (left + right) / 2.0
             for left, right in zip(query_embedding, related_embedding)
         ]
-    elif related_embedding:
+    elif related_embedding is not None:
         query_embedding = related_embedding
 
     if query_embedding is None:

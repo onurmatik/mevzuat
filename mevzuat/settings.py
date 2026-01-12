@@ -198,6 +198,23 @@ MAGIC_LINK_REDIRECT_URL = os.getenv("MAGIC_LINK_REDIRECT_URL", "")
 SESAME_MAX_AGE = int(os.getenv("SESAME_MAX_AGE", "3600"))
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@mevzuat.info")
 
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "loggers": {
+        "mevzuat.documents": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
+
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND")
 if not EMAIL_BACKEND:
     EMAIL_BACKEND = (

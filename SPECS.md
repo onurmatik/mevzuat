@@ -116,21 +116,29 @@ datatable endpoint. Key fetchers include:
 - `KanunFetcher`, `KHKFetcher`, `CBKararnameFetcher`, `CBKararFetcher`,
   `CBYonetmelikFetcher`, `CBGenelgeFetcher`, `YonetmelikFetcher`.
 
-### Create document records
+### End-to-end ingest
 Management command: `fetch_new`
 - For each active `DocumentType`, calls `scripts.mevzuat_scraper.fetch_documents`.
 - Creates `Document` rows with raw metadata.
+- For newly created documents:
+  - Downloads and stores PDFs.
+  - Converts PDFs to Markdown.
+  - Generates embeddings.
+  - Generates summaries.
+  - Generates translations.
 
-### Download PDFs
+### Backfill and maintenance
 Management command: `download_documents`
 - Finds active documents without stored PDFs.
 - Downloads PDFs based on fetcher URL patterns and stores them on disk/S3.
+- Converts PDFs to Markdown after download.
 
-### Convert PDFs to Markdown
-Admin action and model method: `convert_pdf_to_markdown`
-- Uses docling to extract Markdown from the PDF.
-- Optionally forces OCR (Turkish language) when glyph artifacts are detected.
-- Updates `markdown_status` and `file_size` if missing.
+Management command: `generate_embeddings`
+- Generates embeddings for documents with Markdown content.
+
+Admin actions and API endpoints
+- Convert PDFs to Markdown (admin action and model method: `convert_pdf_to_markdown`).
+- Summaries and translations (admin actions, and `POST /api/documents/{uuid}/summarize` / `translate`).
 
 
 
