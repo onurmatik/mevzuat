@@ -408,7 +408,7 @@ export default function SearchPage() {
                           {statsLoading ? '...' : statsTotal}
                         </span>
                       </div>
-                      <div className="h-40 bg-background border border-border rounded-lg p-2">
+                      <div className="h-40 bg-background p-2">
                         {statsLoading ? (
                           <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
                             Loading...
