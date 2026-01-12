@@ -85,8 +85,8 @@ export default function SearchPage() {
             uuid: r.attributes.uuid || '',
             title: r.attributes.title || r.filename,
             content: null,
-            summary: null,
-            number: r.attributes.number || null,
+            summary: r.attributes.summary ?? null,
+            number: r.attributes.number ?? null,
             type: r.type,
             date: r.attributes.date || null
           }));

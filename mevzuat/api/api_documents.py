@@ -210,7 +210,12 @@ def search_documents(
                     "id": doc.id,
                     "uuid": str(doc.uuid),
                     "title": doc.title,
-                    "number": doc.metadata.get("MevzuatNo"),
+                    "number": (
+                        doc.metadata.get("mevzuatNo")
+                        or doc.metadata.get("MevzuatNo")
+                        or doc.metadata.get("mevzuat_no")
+                    ),
+                    "summary": doc.summary,
                     "date": doc.date.isoformat() if doc.date else None,
                 }
             }
