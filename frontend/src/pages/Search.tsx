@@ -53,33 +53,62 @@ export default function SearchPage() {
 
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [offset, setOffset] = useState(0);
+
+  const PAGE_SIZE = 10;
+
+  const buildFilters = () => {
+    const filters: Record<string, any> = {};
+    if (selectedType !== 'all') filters.type = selectedType;
+    if (dateRange === 'last-30') {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      filters.start_date = d.toISOString().split('T')[0];
+    } else if (dateRange === 'last-year') {
+      const d = new Date();
+      d.setFullYear(d.getFullYear() - 1);
+      filters.start_date = d.toISOString().split('T')[0];
+    }
+    if (dateRange === 'custom' && customStartDate) filters.start_date = customStartDate;
+    if (dateRange === 'custom' && customEndDate) filters.end_date = customEndDate;
+
+    if (relatedToId) {
+      filters.related_to = relatedToId;
+    }
+
+    return filters;
+  };
 
   useEffect(() => {
+    setOffset(0);
+    setDocs([]);
+    setHasMore(false);
+    setLoadingMore(false);
+  }, [query, selectedType, dateRange, customStartDate, customEndDate, relatedToId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
     async function doSearch() {
-      setLoading(true);
+      const shouldSearch = Boolean(query) || Boolean(relatedToId);
+      if (offset === 0) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
       try {
-        // Construct filters
-        const filters: Record<string, any> = {};
-        if (selectedType !== 'all') filters.type = selectedType;
-        if (dateRange === 'last-30') {
-          const d = new Date(); d.setDate(d.getDate() - 30);
-          filters.start_date = d.toISOString().split('T')[0];
-        } else if (dateRange === 'last-year') {
-          const d = new Date(); d.setFullYear(d.getFullYear() - 1);
-          filters.start_date = d.toISOString().split('T')[0];
-        }
-        if (dateRange === 'custom' && customStartDate) filters.start_date = customStartDate;
-        if (dateRange === 'custom' && customEndDate) filters.end_date = customEndDate;
-
-        if (relatedToId) {
-          filters.related_to = relatedToId;
-        }
-
-        const shouldSearch = Boolean(query) || Boolean(relatedToId);
+        const filters = buildFilters();
         let results: Document[] = [];
+        let more = false;
+
         if (shouldSearch) {
-          const response = await api.searchDocuments(query || undefined, filters);
+          const response = await api.searchDocuments(query || undefined, {
+            ...filters,
+            limit: PAGE_SIZE,
+            offset
+          });
           results = response.data.map(r => ({
             id: r.attributes.id || 0,
             uuid: r.attributes.uuid || '',
@@ -90,18 +119,40 @@ export default function SearchPage() {
             type: r.type,
             date: r.attributes.date || null
           }));
+          more = response.has_more;
         } else {
-          results = await api.listDocuments(filters);
+          results = await api.listDocuments({
+            ...filters,
+            limit: PAGE_SIZE,
+            offset
+          });
+          more = results.length === PAGE_SIZE;
         }
-        setDocs(results);
+
+        if (cancelled) return;
+        if (offset === 0) {
+          setDocs(results);
+        } else {
+          setDocs(prev => [...prev, ...results]);
+        }
+        setHasMore(more);
       } catch (e) {
         console.error("Search failed", e);
       } finally {
-        setLoading(false);
+        if (cancelled) return;
+        if (offset === 0) {
+          setLoading(false);
+        } else {
+          setLoadingMore(false);
+        }
       }
     }
+
     doSearch();
-  }, [query, selectedType, dateRange, customStartDate, customEndDate, relatedToId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [query, selectedType, dateRange, customStartDate, customEndDate, relatedToId, offset]);
 
   const filteredDocs = docs; // Using state directly
 
@@ -307,6 +358,20 @@ export default function SearchPage() {
                 {filteredDocs.map((doc) => (
                   <DocumentCard key={doc.id} doc={doc} />
                 ))}
+                {hasMore && (
+                  <div className="flex justify-center pt-4">
+                    <button
+                      onClick={() => setOffset(prev => prev + PAGE_SIZE)}
+                      disabled={loadingMore}
+                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${loadingMore
+                        ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                        }`}
+                    >
+                      {loadingMore ? 'Loading...' : 'Load more'}
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center py-24 bg-muted/20 rounded-lg border border-dashed border-border">
