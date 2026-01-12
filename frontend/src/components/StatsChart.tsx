@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Rectangle } from 'recharts';
 import { StatsData } from '../lib/api';
 import { format, parseISO } from 'date-fns';
 import { enUS, tr } from 'date-fns/locale';
@@ -10,6 +10,7 @@ interface StatsChartProps {
   data?: StatsData[];
   rangeStart?: string;
   rangeEnd?: string;
+  onSegmentClick?: (info: { period: string; type: string; timeRange: '30days' | '12months' | 'all' }) => void;
 }
 
 
@@ -18,7 +19,8 @@ export function StatsChart({
   timeRange = '30days',
   data: apiData,
   rangeStart,
-  rangeEnd
+  rangeEnd,
+  onSegmentClick
 }: StatsChartProps) {
   const { language } = useLanguage();
 
@@ -56,7 +58,8 @@ export function StatsChart({
           const standardKey = format(cursor, 'yyyy-MM-dd');
           grouped.set(standardKey, {
             name: format(cursor, 'd MMM', { locale: language === 'tr' ? tr : enUS }),
-            originalDate: new Date(cursor)
+            originalDate: new Date(cursor),
+            periodKey: standardKey
           });
           cursor.setDate(cursor.getDate() + 1);
         }
@@ -67,7 +70,8 @@ export function StatsChart({
           const standardKey = format(d, 'yyyy-MM-dd');
           grouped.set(standardKey, {
             name: format(d, 'd MMM', { locale: language === 'tr' ? tr : enUS }),
-            originalDate: d
+            originalDate: d,
+            periodKey: standardKey
           });
         }
       }
@@ -79,7 +83,8 @@ export function StatsChart({
           const standardKey = format(cursor, 'yyyy-MM');
           grouped.set(standardKey, {
             name: format(cursor, 'MMM yy', { locale: language === 'tr' ? tr : enUS }),
-            originalDate: new Date(cursor)
+            originalDate: new Date(cursor),
+            periodKey: standardKey
           });
           cursor.setMonth(cursor.getMonth() + 1);
         }
@@ -91,7 +96,8 @@ export function StatsChart({
           const standardKey = format(d, 'yyyy-MM');
           grouped.set(standardKey, {
             name: format(d, 'MMM yy', { locale: language === 'tr' ? tr : enUS }),
-            originalDate: d
+            originalDate: d,
+            periodKey: standardKey
           });
         }
       }
@@ -113,7 +119,8 @@ export function StatsChart({
         if (!grouped.has(key)) {
           grouped.set(key, {
             name: String(y),
-            originalDate: d
+            originalDate: d,
+            periodKey: key
           });
         }
       }
@@ -130,10 +137,13 @@ export function StatsChart({
         else if (timeRange === '12months') label = format(item.date, 'MMM yy', { locale: language === 'tr' ? tr : enUS });
         else label = format(item.date, 'yyyy', { locale: language === 'tr' ? tr : enUS });
 
-        grouped.set(item.key, { name: label, originalDate: item.date });
+        grouped.set(item.key, { name: label, originalDate: item.date, periodKey: item.key });
       }
 
       const entry = grouped.get(item.key);
+      if (!entry.periodKey) {
+        entry.periodKey = item.key;
+      }
       const typeKey = item.type;
       entry[typeKey] = (entry[typeKey] || 0) + item.count;
     });
@@ -141,6 +151,29 @@ export function StatsChart({
     return Array.from(grouped.values())
       .sort((a, b) => a.originalDate.getTime() - b.originalDate.getTime());
   }, [timeRange, apiData, language, rangeStart, rangeEnd]);
+
+  const renderClickableBar = (props: any) => {
+    const { payload, dataKey, value } = props;
+    const hasValue = typeof value === 'number' ? value > 0 : Array.isArray(value) ? value[1] > value[0] : Boolean(value);
+    const isClickable = Boolean(onSegmentClick && payload?.periodKey && dataKey && hasValue);
+
+    return (
+      <Rectangle
+        {...props}
+        onClick={
+          isClickable
+            ? () =>
+              onSegmentClick?.({
+                period: payload.periodKey,
+                type: String(dataKey),
+                timeRange
+              })
+            : undefined
+        }
+        style={isClickable ? { cursor: 'pointer' } : undefined}
+      />
+    );
+  };
 
   return (
     <div className="w-full h-full">
@@ -182,12 +215,12 @@ export function StatsChart({
             labelStyle={{ fontWeight: 600, marginBottom: '4px', color: '#18181b' }}
           />
           {/* Order matches legend: Kanun, KHK, CB Kararname, CB Yönetmelik, CB Karar, CB Genelge */}
-          <Bar dataKey="kanun" name="Kanun" stackId="a" fill="#18181b" radius={[0, 0, 0, 0]} />
-          <Bar dataKey="khk" name="KHK" stackId="a" fill="#dc2626" />
-          <Bar dataKey="cb-kararname" name="CB Kararname" stackId="a" fill="#d97706" />
-          <Bar dataKey="cb-yonetmelik" name="CB Yönetmelik" stackId="a" fill="#7c3aed" />
-          <Bar dataKey="cb-karar" name="CB Karar" stackId="a" fill="#2563eb" />
-          <Bar dataKey="cb-genelge" name="CB Genelge" stackId="a" fill="#059669" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="kanun" name="Kanun" stackId="a" fill="#18181b" radius={[0, 0, 0, 0]} shape={renderClickableBar} />
+          <Bar dataKey="khk" name="KHK" stackId="a" fill="#dc2626" shape={renderClickableBar} />
+          <Bar dataKey="cb-kararname" name="CB Kararname" stackId="a" fill="#d97706" shape={renderClickableBar} />
+          <Bar dataKey="cb-yonetmelik" name="CB Yönetmelik" stackId="a" fill="#7c3aed" shape={renderClickableBar} />
+          <Bar dataKey="cb-karar" name="CB Karar" stackId="a" fill="#2563eb" shape={renderClickableBar} />
+          <Bar dataKey="cb-genelge" name="CB Genelge" stackId="a" fill="#059669" radius={[4, 4, 0, 0]} shape={renderClickableBar} />
         </BarChart>
       </ResponsiveContainer>
     </div>

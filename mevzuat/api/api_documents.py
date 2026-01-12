@@ -151,6 +151,7 @@ def search_documents(
     type: Optional[str] = Query(None, description="Document type slug"),
     start_date: Optional[dt_date] = Query(None),
     end_date: Optional[dt_date] = Query(None),
+    min_score: float = Query(0.5, ge=-1, le=1),
     limit: int = Query(10),
     offset: int = Query(0),
 ):
@@ -199,6 +200,7 @@ def search_documents(
     qs = qs.annotate(
         distance=CosineDistance("embedding", query_embedding)
     ).order_by("distance")
+    qs = qs.filter(distance__lte=1 - min_score)
 
     # Get total count before pagination
     total_count = qs.count()

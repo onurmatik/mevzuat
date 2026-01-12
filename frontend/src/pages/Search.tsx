@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search as SearchIcon, Filter, Calendar, FileText, X, Bookmark, BookmarkCheck } from 'lucide-react';
 import { DOC_TYPE_LABELS, DocType } from '../data/mock';
@@ -100,6 +100,38 @@ export default function SearchPage() {
   const statsTotal = useMemo(() => {
     return statsData.reduce((sum, item) => sum + item.count, 0);
   }, [statsData]);
+
+  const handleChartSegmentClick = useCallback((info: { period: string; type: string; timeRange: '30days' | '12months' | 'all' }) => {
+    let start = '';
+    let end = '';
+
+    if (info.timeRange === '30days') {
+      start = info.period;
+      end = info.period;
+    } else if (info.timeRange === '12months') {
+      const [yearStr, monthStr] = info.period.split('-');
+      const year = Number(yearStr);
+      const month = Number(monthStr);
+      if (!Number.isNaN(year) && !Number.isNaN(month)) {
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 0);
+        start = startDate.toISOString().split('T')[0];
+        end = endDate.toISOString().split('T')[0];
+      }
+    } else {
+      const year = Number(info.period);
+      if (!Number.isNaN(year)) {
+        start = `${year}-01-01`;
+        end = `${year}-12-31`;
+      }
+    }
+
+    if (!start || !end) return;
+    setSelectedType(info.type);
+    setDateRange('custom');
+    setCustomStartDate(start);
+    setCustomEndDate(end);
+  }, []);
 
   const buildFilters = () => {
     const filters: Record<string, any> = {};
@@ -387,6 +419,7 @@ export default function SearchPage() {
                             data={statsData}
                             rangeStart={chartRangeStart}
                             rangeEnd={chartRangeEnd}
+                            onSegmentClick={handleChartSegmentClick}
                           />
                         ) : (
                           <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
