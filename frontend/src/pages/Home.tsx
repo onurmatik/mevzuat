@@ -63,7 +63,7 @@ export default function Home() {
   const recentKeywords = useMemo(() => {
     const seen = new Set<string>();
     const keywords: string[] = [];
-    recentDocs.slice(0, 10).forEach((doc) => {
+    recentDocs.forEach((doc) => {
       const source = language === 'en' && doc.keywords_en?.length
         ? doc.keywords_en
         : doc.keywords;
@@ -73,7 +73,7 @@ export default function Home() {
         keywords.push(keyword);
       }
     });
-    return keywords;
+    return keywords.slice(0, 40);
   }, [recentDocs, language]);
 
   return (
