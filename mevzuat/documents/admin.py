@@ -82,11 +82,10 @@ class HasKeywordsFilter(admin.SimpleListFilter):
     def queryset(self, request, queryset):
         val = self.value()
         has_keywords = Q(keywords__isnull=False) & ~Q(keywords=[])
-        has_keywords_en = Q(keywords_en__isnull=False) & ~Q(keywords_en=[])
         if val == "yes":
-            return queryset.filter(has_keywords | has_keywords_en)
+            return queryset.filter(has_keywords)
         if val == "no":
-            return queryset.filter(~(has_keywords | has_keywords_en))
+            return queryset.filter(~has_keywords)
         return queryset
 
 
@@ -687,7 +686,7 @@ class DocumentAdmin(admin.ModelAdmin):
         skipped = 0
         errors = []
         for obj in queryset:
-            if not obj.summary and not obj.summary_en:
+            if not obj.summary:
                 skipped += 1
                 continue
             try:

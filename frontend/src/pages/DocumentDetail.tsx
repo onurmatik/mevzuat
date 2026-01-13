@@ -152,7 +152,7 @@ export default function DocumentDetail() {
                 </span>
               </div>
 
-              <h1 className="text-3xl sm:text-4xl font-bold text-foreground leading-tight mb-6">
+              <h1 className="sm:text-2xl font-bold text-foreground leading-tight mb-4">
                 {doc.title}
               </h1>
 

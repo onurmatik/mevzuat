@@ -382,9 +382,12 @@ class Document(models.Model):
         if self.summary and (overwrite or not self.keywords):
             self.keywords = generate_keywords(self.summary, "Turkish")
             update_fields.append("keywords")
+        # TODO: move keyword_en to translate()
+        """
         if self.summary_en and (overwrite or not self.keywords_en):
             self.keywords_en = generate_keywords(self.summary_en, "English")
             update_fields.append("keywords_en")
+        """
 
         if update_fields:
             self.save(update_fields=update_fields)
