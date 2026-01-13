@@ -22,6 +22,8 @@ const translations: Record<string, Record<Language, string>> = {
   
   'stats.title': { tr: 'VERİ AKIŞI', en: 'DATA FLOW' },
   'stats.subtitle': { tr: 'Son 6 ayın yasama hacmi', en: 'Legislative volume of last 6 months' },
+  'stats.recent_keywords': { tr: 'GÜNCEL KELİMELER', en: 'RECENT KEYWORDS' },
+  'stats.no_keywords': { tr: 'Anahtar kelime bulunamadı.', en: 'No keywords available.' },
   
   'recent.title': { tr: 'SON GİRİŞLER', en: 'LATEST ENTRIES' },
   'recent.view_all': { tr: 'TÜMÜNÜ GÖR', en: 'VIEW ALL' },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, ArrowRight, ArrowUpRight, BarChart3, Calendar } from 'lucide-react';
 import { api, Document, StatsData } from '../lib/api';
@@ -12,7 +12,7 @@ type TimeRange = '30days' | '12months' | 'all';
 export default function Home() {
   const [recentDocs, setRecentDocs] = useState<Document[]>([]);
   const [stats, setStats] = useState<StatsData[]>([]); // Need to update StatsChart to handle this data format later
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [timeRange, setTimeRange] = useState<TimeRange>('30days');
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
@@ -20,12 +20,8 @@ export default function Home() {
   useEffect(() => {
     async function loadData() {
       try {
-        const docs = await api.listDocuments({ limit: 3 }); // Assuming list supports limit, though api.py's list_documents doesn't explicit param query yet, need to check if default ordering is date. It is.
-        // Wait, api.py list_documents doesn't have limit param. It returns QuerySet. 
-        // ninja usually supports pagination but list_documents has filtering. 
-        // I should limit it client side for now or add limit param to backend.
-        // The backend returns all matching documents! This is bad for performance.
-        setRecentDocs(docs.slice(0, 3));
+        const docs = await api.listDocuments({ limit: 10 });
+        setRecentDocs(docs);
 
         // For stats, we need to map timeRange to interval
         const intervalMap: Record<TimeRange, 'day' | 'month' | 'year'> = {
@@ -63,6 +59,22 @@ export default function Home() {
     { value: '12months', label: 'Last 12 Months', desc: 'Monthly distribution' },
     { value: 'all', label: 'All Time', desc: 'Yearly distribution' },
   ];
+
+  const recentKeywords = useMemo(() => {
+    const seen = new Set<string>();
+    const keywords: string[] = [];
+    recentDocs.slice(0, 10).forEach((doc) => {
+      const source = language === 'en' && doc.keywords_en?.length
+        ? doc.keywords_en
+        : doc.keywords;
+      const keyword = source?.[0];
+      if (keyword && !seen.has(keyword)) {
+        seen.add(keyword);
+        keywords.push(keyword);
+      }
+    });
+    return keywords;
+  }, [recentDocs, language]);
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -110,11 +122,10 @@ export default function Home() {
       {/* Stats Section - Clean & Minimal */}
       <section className="py-16 bg-muted/30 border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-start justify-between gap-12">
-            <div className="md:w-1/3 flex flex-col h-full justify-between">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr_1fr] gap-8">
+            <div className="flex flex-col h-full justify-between">
               <div>
                 <h2 className="text-2xl font-semibold text-foreground mb-2">{t('stats.title')}</h2>
-                <p className="text-sm text-muted-foreground mb-8">{t('stats.subtitle')}</p>
 
                 {/* Legend & Selector */}
                 <div className="space-y-4">
@@ -171,7 +182,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="md:w-2/3 w-full h-[320px] bg-background border border-border rounded-xl p-4 shadow-sm">
+            <div className="w-full h-[240px] bg-background border border-border rounded-xl p-4 shadow-sm">
               {/* Assuming StatsChart can handle the new data structure or I need to adapt it. 
                     MOCK_STATS was array of objects with keys per type.
                     StatsData is array of {period, type, count}.
@@ -179,6 +190,29 @@ export default function Home() {
                     For now, I'll update Home.tsx to transform before passing.
                 */}
               <StatsChart data={stats} timeRange={timeRange} />
+            </div>
+
+            <div className="w-full h-[240px] bg-background rounded-xl p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">
+                  {t('stats.recent_keywords')}
+                </h3>
+              </div>
+              {recentKeywords.length > 0 ? (
+                <div className="flex flex-wrap gap-2 overflow-y-auto max-h-[180px] pr-1">
+                  {recentKeywords.map((keyword) => (
+                    <Link
+                      key={keyword}
+                      to={`/search?q=${encodeURIComponent(keyword)}`}
+                      className="px-2 py-1 bg-secondary/30 border border-border rounded text-xs text-foreground hover:border-primary/50 hover:text-primary transition-colors"
+                    >
+                      {keyword}
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-xs text-muted-foreground">{t('stats.no_keywords')}</span>
+              )}
             </div>
           </div>
         </div>
@@ -194,7 +228,7 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {recentDocs.map((doc) => (
+          {recentDocs.slice(0, 3).map((doc) => (
             <DocumentCard key={doc.id} doc={doc} />
           ))}
         </div>
