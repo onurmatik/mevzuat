@@ -9,9 +9,10 @@ import { useLanguage } from '../store/language';
 interface DocumentCardProps {
   doc: Document;
   onRelated?: (doc: Document) => void;
+  showKeywords?: boolean;
 }
 
-export function DocumentCard({ doc, onRelated }: DocumentCardProps) {
+export function DocumentCard({ doc, onRelated, showKeywords = true }: DocumentCardProps) {
   const { language } = useLanguage();
   const typeKey = doc.type;
   const typeLabel = (DOC_TYPE_LABELS as any)[typeKey]?.[language] || doc.type;
@@ -48,20 +49,20 @@ export function DocumentCard({ doc, onRelated }: DocumentCardProps) {
           {doc.summary}
         </p>
 
-        {(displayKeywords.length > 0 || onRelated) && (
+        {(showKeywords && displayKeywords.length > 0) || onRelated ? (
           <div className="mt-auto pt-2 flex flex-wrap items-center gap-1.5">
-            {displayKeywords.slice(0, 6).map((keyword) => (
-              <Link
-                key={keyword}
-                to={`/search?q=${encodeURIComponent(keyword)}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                }}
-                className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border/60 rounded px-1.5 py-0.5 bg-background hover:border-primary/50 hover:text-primary transition-colors"
-              >
-                {keyword}
-              </Link>
-            ))}
+            {showKeywords && displayKeywords.slice(0, 6).map((keyword) => (
+                <Link
+                  key={keyword}
+                  to={`/search?q=${encodeURIComponent(keyword)}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                  }}
+                  className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border/60 rounded px-1.5 py-0.5 bg-background hover:border-primary/50 hover:text-primary transition-colors"
+                >
+                  {keyword}
+                </Link>
+              ))}
             {onRelated && (
               <button
                 type="button"
@@ -76,7 +77,7 @@ export function DocumentCard({ doc, onRelated }: DocumentCardProps) {
               </button>
             )}
           </div>
-        )}
+        ) : null}
 
       </article>
     </Link>
