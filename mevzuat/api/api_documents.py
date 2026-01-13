@@ -110,6 +110,8 @@ class DocumentOut(Schema):
     summary: Optional[str] = None
     keywords: Optional[list[str]] = None
     keywords_en: Optional[list[str]] = None
+    document_url: Optional[str] = None
+    original_document_url: Optional[str] = None
     number: Optional[str] = None
     date: Optional[dt_date] = None
     type: str = Field(..., alias="type.slug")
@@ -133,6 +135,22 @@ class DocumentOut(Schema):
     @staticmethod
     def resolve_type(obj):
         return obj.type.slug if obj.type else None
+
+    @staticmethod
+    def resolve_document_url(obj):
+        if obj.document:
+            try:
+                return obj.document.url
+            except Exception:  # pragma: no cover - storage dependent
+                return None
+        return None
+
+    @staticmethod
+    def resolve_original_document_url(obj):
+        try:
+            return obj.original_document_url
+        except Exception:  # pragma: no cover - fetcher dependent
+            return None
 
 
 class DocumentTypeOut(Schema):

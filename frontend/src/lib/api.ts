@@ -9,6 +9,8 @@ export interface Document {
   summary: string | null;
   keywords?: string[] | null;
   keywords_en?: string[] | null;
+  document_url?: string | null;
+  original_document_url?: string | null;
   number: string | null;
 }
 

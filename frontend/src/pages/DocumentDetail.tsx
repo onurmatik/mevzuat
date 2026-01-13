@@ -15,6 +15,8 @@ export default function DocumentDetail() {
   const [relatedDocs, setRelatedDocs] = useState<Document[]>([]);
   const { isAuthenticated, user } = useAuth();
   const [flagging, setFlagging] = useState(false);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [showFlagConfirm, setShowFlagConfirm] = useState(false);
 
   const { t, language } = useLanguage();
 
@@ -51,17 +53,49 @@ export default function DocumentDetail() {
     load();
   }, [id]);
 
-  const handleFlag = async () => {
-    if (!doc || !isAuthenticated) return;
-    if (!confirm("Are you sure you want to flag this document as problematic?")) return;
+  const pushActionNotice = (message: string) => {
+    setActionNotice(message);
+    window.setTimeout(() => {
+      setActionNotice((current) => (current === message ? null : current));
+    }, 3000);
+  };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleShare = async () => {
+    const shareUrl = window.location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: doc?.title,
+          url: shareUrl,
+        });
+        return;
+      }
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        pushActionNotice("Link copied.");
+        return;
+      }
+      window.prompt("Copy this link:", shareUrl);
+    } catch (e) {
+      console.error("Share failed", e);
+      pushActionNotice("Share failed.");
+    }
+  };
+
+  const confirmFlag = async () => {
+    if (!doc || !isAuthenticated) return;
+    setShowFlagConfirm(false);
     setFlagging(true);
     try {
       await api.flagDocument(doc.uuid);
-      alert("Document flagged successfully. Thank you for your feedback.");
+      pushActionNotice("Document flagged. Thanks for the feedback.");
     } catch (e) {
       console.error("Flag failed", e);
-      alert("Failed to flag document.");
+      pushActionNotice("Failed to flag document.");
     } finally {
       setFlagging(false);
     }
@@ -97,6 +131,7 @@ export default function DocumentDetail() {
     ? doc.keywords_en
     : (doc.keywords || []);
   const uniqueKeywords = Array.from(new Set(docKeywords)).filter(Boolean);
+  const downloadUrl = doc.document_url || doc.original_document_url;
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -108,15 +143,26 @@ export default function DocumentDetail() {
             {t('nav.search')}
           </Link>
           <div className="flex items-center gap-2">
-            <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors" title="Print">
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors"
+              title="Print"
+            >
               <Printer size={16} />
             </button>
-            <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors" title="Share">
+            <button
+              type="button"
+              onClick={handleShare}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors"
+              title="Share"
+            >
               <Share2 size={16} />
             </button>
             {isAuthenticated && (
               <button
-                onClick={handleFlag}
+                type="button"
+                onClick={() => setShowFlagConfirm((current) => !current)}
                 disabled={flagging}
                 className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
                 title="Flag as Problematic"
@@ -125,12 +171,58 @@ export default function DocumentDetail() {
               </button>
             )}
             <div className="w-px h-4 bg-border mx-1"></div>
-            <button className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-md hover:bg-primary/90 transition-colors">
-              <Download size={14} />
-              <span>Download PDF</span>
-            </button>
+            {downloadUrl ? (
+              <a
+                href={downloadUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-md hover:bg-primary/90 transition-colors"
+              >
+                <Download size={14} />
+                <span>Download PDF</span>
+              </a>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="flex items-center gap-2 px-3 py-1.5 bg-primary/50 text-primary-foreground/70 text-xs font-medium rounded-md cursor-not-allowed"
+                title="PDF not available"
+              >
+                <Download size={14} />
+                <span>Download PDF</span>
+              </button>
+            )}
+            {actionNotice && (
+              <span className="text-xs text-muted-foreground ml-2">{actionNotice}</span>
+            )}
           </div>
         </div>
+        {showFlagConfirm && (
+          <div className="border-t border-border/60 bg-background/90">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between gap-3">
+              <span className="text-xs text-muted-foreground">
+                Flag this document as problematic?
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowFlagConfirm(false)}
+                  className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmFlag}
+                  disabled={flagging}
+                  className="text-xs font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 px-2.5 py-1 rounded"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
