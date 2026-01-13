@@ -7,6 +7,8 @@ export interface Document {
   date: string | null;
   content: string | null;
   summary: string | null;
+  keywords?: string[] | null;
+  keywords_en?: string[] | null;
   number: string | null;
 }
 

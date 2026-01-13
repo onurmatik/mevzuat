@@ -72,6 +72,23 @@ class HasEmbeddingFilter(admin.SimpleListFilter):
         return queryset
 
 
+class HasKeywordsFilter(admin.SimpleListFilter):
+    title = "Has keywords?"
+    parameter_name = "has_keywords"
+
+    def lookups(self, request, model_admin):
+        return (("yes", "Yes"), ("no", "No"))
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        has_keywords = Q(keywords__isnull=False) & ~Q(keywords=[])
+        has_keywords_en = Q(keywords_en__isnull=False) & ~Q(keywords_en=[])
+        if val == "yes":
+            return queryset.filter(has_keywords | has_keywords_en)
+        if val == "no":
+            return queryset.filter(~(has_keywords | has_keywords_en))
+        return queryset
+
 
 
 
@@ -205,6 +222,7 @@ class DocumentAdmin(admin.ModelAdmin):
         "mevzuat_tertip",
         "mevzuat_no",
         "type",
+        "keywords_preview",
         "file_size",
         "md_length",
         "date",
@@ -226,6 +244,7 @@ class DocumentAdmin(admin.ModelAdmin):
         HasPdfFilter,
         HasMdFilter,
         HasEmbeddingFilter,
+        HasKeywordsFilter,
         TranslatedFilter,
         SummarizedFilter,
         FileSizeFilter,
@@ -241,6 +260,7 @@ class DocumentAdmin(admin.ModelAdmin):
         "set_file_sizes",
         "generate_embeddings",
         "summarize_documents",
+        "extract_keywords",
         "translate_documents",
     )
 
@@ -273,6 +293,26 @@ class DocumentAdmin(admin.ModelAdmin):
 
     def md_length(self, obj):
         return obj.markdown and len(obj.markdown) or '-'
+
+    @admin.display(description="Keywords")
+    def keywords_preview(self, obj: Document) -> str:
+        def format_keywords(values):
+            if not values:
+                return ""
+            items = [str(value).strip() for value in values if str(value).strip()]
+            if not items:
+                return ""
+            limit = 5
+            if len(items) > limit:
+                return ", ".join(items[:limit]) + f" (+{len(items) - limit})"
+            return ", ".join(items)
+
+        primary = format_keywords(obj.keywords)
+        # secondary = format_keywords(obj.keywords_en)
+        secondary = None  # Show only TR keywords
+        if primary and secondary:
+            return f"{primary} / {secondary}"
+        return primary or secondary or "-"
 
     @admin.display(boolean=True, description="Has pdf?", ordering="document")
     def has_pdf(self, obj: Document) -> bool:
@@ -638,6 +678,39 @@ class DocumentAdmin(admin.ModelAdmin):
             self.message_user(
                 request,
                 f"{obj.title} could not be summarized: {exc}",
+                level=messages.ERROR,
+            )
+
+    def extract_keywords(self, request, queryset):
+        """Extract keywords from summaries for selected documents."""
+        ok = 0
+        skipped = 0
+        errors = []
+        for obj in queryset:
+            if not obj.summary and not obj.summary_en:
+                skipped += 1
+                continue
+            try:
+                obj.extract_keywords(overwrite=True)
+                ok += 1
+            except Exception as exc:  # pragma: no cover - defensive
+                errors.append((obj, exc))
+        if ok:
+            self.message_user(
+                request,
+                f"Successfully extracted keywords for {ok} document(s).",
+                level=messages.SUCCESS,
+            )
+        if skipped:
+            self.message_user(
+                request,
+                f"Skipped {skipped} document(s) because no summary is available.",
+                level=messages.WARNING,
+            )
+        for obj, exc in errors:
+            self.message_user(
+                request,
+                f"{obj.title} could not extract keywords: {exc}",
                 level=messages.ERROR,
             )
 

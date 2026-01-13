@@ -36,6 +36,8 @@ export default function DocumentDetail() {
           title: r.attributes.title || r.filename,
           content: null,
           summary: r.attributes.summary ?? null,
+          keywords: r.attributes.keywords ?? null,
+          keywords_en: r.attributes.keywords_en ?? null,
           number: r.attributes.number ?? null,
           type: r.type,
           date: r.attributes.date || null
@@ -91,6 +93,10 @@ export default function DocumentDetail() {
   // Fallback for type label if not found in MOCK
   const typeKey = doc.type;
   const typeLabel = (DOC_TYPE_LABELS as any)[typeKey]?.[language] || doc.type;
+  const docKeywords = (language === 'en' && doc.keywords_en && doc.keywords_en.length > 0)
+    ? doc.keywords_en
+    : (doc.keywords || []);
+  const uniqueKeywords = Array.from(new Set(docKeywords)).filter(Boolean);
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -137,6 +143,10 @@ export default function DocumentDetail() {
                 <span className="inline-flex items-center rounded-md bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground">
                   {typeLabel}
                 </span>
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground font-mono">
+                  <Hash size={12} />
+                  {doc.number || "-"}
+                </span>
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <Clock size={12} /> {doc.date}
                 </span>
@@ -170,30 +180,6 @@ export default function DocumentDetail() {
           {/* Sidebar Metadata */}
           <div className="lg:col-span-4">
             <div className="sticky top-24 space-y-6">
-
-              {/* Document Details Box */}
-              <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
-                <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4 pb-2 border-b border-border">
-                  {t('doc.details')}
-                </h3>
-
-                <dl className="space-y-4 text-sm">
-                  <div>
-                    <dt className="text-xs text-muted-foreground font-medium mb-1 uppercase">Official Number</dt>
-                    <dd className="font-mono font-medium text-foreground bg-secondary/50 px-2 py-1 rounded inline-block">
-                      {doc.number || "-"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-foreground font-medium mb-1 uppercase">Publish Date</dt>
-                    <dd className="font-medium text-foreground">{doc.date || "-"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-foreground font-medium mb-1 uppercase">Category</dt>
-                    <dd className="font-medium text-foreground">{typeLabel}</dd>
-                  </div>
-                </dl>
-              </div>
 
               {/* Related Documents Section (NEW) */}
               <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
@@ -238,10 +224,19 @@ export default function DocumentDetail() {
               <div className="rounded-lg border border-border bg-muted/20 p-5">
                 <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3">{t('doc.topics')}</h4>
                 <div className="flex flex-wrap gap-2">
-                  {/* Mock topics for now */}
-                  <span className="px-2 py-1 bg-background border border-border rounded text-xs text-foreground cursor-pointer hover:border-primary/50">Ticaret</span>
-                  <span className="px-2 py-1 bg-background border border-border rounded text-xs text-foreground cursor-pointer hover:border-primary/50">Elektronik</span>
-                  <span className="px-2 py-1 bg-background border border-border rounded text-xs text-foreground cursor-pointer hover:border-primary/50">Hukuk</span>
+                  {uniqueKeywords.length > 0 ? (
+                    uniqueKeywords.map((keyword) => (
+                      <Link
+                        key={keyword}
+                        to={`/search?q=${encodeURIComponent(keyword)}`}
+                        className="px-2 py-1 bg-background border border-border rounded text-xs text-foreground hover:border-primary/50 hover:text-primary transition-colors"
+                      >
+                        {keyword}
+                      </Link>
+                    ))
+                  ) : (
+                    <span className="text-xs text-muted-foreground">No keywords available.</span>
+                  )}
                 </div>
               </div>
 

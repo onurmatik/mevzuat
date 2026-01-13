@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import re
 import uuid
 from functools import cached_property
@@ -85,6 +86,8 @@ class Document(models.Model):
     metadata = models.JSONField(default=dict, blank=True)
     summary = models.TextField(blank=True, null=True)
     summary_en = models.TextField(blank=True, null=True)
+    keywords = models.JSONField(default=list, blank=True)
+    keywords_en = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
 
@@ -318,6 +321,75 @@ class Document(models.Model):
             self.save(update_fields=update_fields)
         
         return {"title_en": self.title_en, "summary_en": self.summary_en}
+
+    def extract_keywords(self, overwrite=False, max_keywords=8):
+        """Extract keyword lists from the Turkish and English summaries."""
+        if not overwrite and self.keywords and (self.summary_en is None or self.keywords_en):
+            return {"keywords": self.keywords, "keywords_en": self.keywords_en}
+
+        if not self.summary and not self.summary_en:
+            raise ValueError("Document has no summaries to extract keywords from")
+
+        from openai import OpenAI
+        client = OpenAI()
+
+        def parse_keywords(raw: str) -> list[str]:
+            if not raw:
+                return []
+            try:
+                data = json.loads(raw)
+                if isinstance(data, list):
+                    items = [str(item).strip() for item in data if str(item).strip()]
+                else:
+                    items = []
+            except json.JSONDecodeError:
+                cleaned = raw.strip().strip("[]")
+                items = [part.strip(" \"'") for part in cleaned.split(",") if part.strip()]
+            seen = set()
+            result = []
+            for item in items:
+                if item not in seen:
+                    seen.add(item)
+                    result.append(item)
+                if len(result) >= max_keywords:
+                    break
+            return result
+
+        def generate_keywords(text: str, language: str) -> list[str]:
+            completion = client.chat.completions.create(
+                model="gpt-5-nano",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Extract concise, non-duplicative keywords from the summary. "
+                            f"Return a JSON array with up to {max_keywords} short keyword phrases. "
+                            "Remove generic modifiers (e.g. 'diğer', 'bazı', 'çeşitli') from keywords. "
+                            "Ensure each keyword is self-contained and specific; expand overly generic terms "
+                            "(e.g. replace 'bulundurma' with a full phrase like 'uyuşturucu madde bulundurma'). "
+                            "No extra text."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Language: {language}\nSummary: {text}",
+                    },
+                ],
+            )
+            return parse_keywords(completion.choices[0].message.content)
+
+        update_fields = []
+        if self.summary and (overwrite or not self.keywords):
+            self.keywords = generate_keywords(self.summary, "Turkish")
+            update_fields.append("keywords")
+        if self.summary_en and (overwrite or not self.keywords_en):
+            self.keywords_en = generate_keywords(self.summary_en, "English")
+            update_fields.append("keywords_en")
+
+        if update_fields:
+            self.save(update_fields=update_fields)
+
+        return {"keywords": self.keywords, "keywords_en": self.keywords_en}
 
 
 class FlaggedDocument(models.Model):

@@ -16,6 +16,10 @@ export function DocumentCard({ doc, onRelated }: DocumentCardProps) {
   const typeKey = doc.type;
   const typeLabel = (DOC_TYPE_LABELS as any)[typeKey]?.[language] || doc.type;
   const numberLabel = doc.number ?? '-';
+  const displayKeywords =
+    language === 'en' && doc.keywords_en && doc.keywords_en.length > 0
+      ? doc.keywords_en
+      : (doc.keywords || []);
 
   return (
     <Link to={`/document/${doc.uuid}`} className="block group h-full">
@@ -29,19 +33,6 @@ export function DocumentCard({ doc, onRelated }: DocumentCardProps) {
               <Hash size={12} />
               {numberLabel}
             </span>
-            {onRelated && (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onRelated(doc);
-                }}
-                className="text-[10px] font-medium text-primary hover:text-primary/80 underline underline-offset-4"
-              >
-                Related
-              </button>
-            )}
           </div>
           <div className="flex items-center text-xs text-muted-foreground tabular-nums">
             <Calendar size={12} className="mr-1.5" />
@@ -56,6 +47,36 @@ export function DocumentCard({ doc, onRelated }: DocumentCardProps) {
         <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed mb-4 flex-1">
           {doc.summary}
         </p>
+
+        {(displayKeywords.length > 0 || onRelated) && (
+          <div className="mt-auto pt-2 flex flex-wrap items-center gap-1.5">
+            {displayKeywords.slice(0, 6).map((keyword) => (
+              <Link
+                key={keyword}
+                to={`/search?q=${encodeURIComponent(keyword)}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                }}
+                className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border/60 rounded px-1.5 py-0.5 bg-background hover:border-primary/50 hover:text-primary transition-colors"
+              >
+                {keyword}
+              </Link>
+            ))}
+            {onRelated && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onRelated(doc);
+                }}
+                className="text-[10px] font-medium text-primary/90 border border-primary/20 rounded px-2 py-0.5 bg-primary/5 hover:bg-primary/10 transition-colors"
+              >
+                Related to this
+              </button>
+            )}
+          </div>
+        )}
 
       </article>
     </Link>

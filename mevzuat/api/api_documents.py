@@ -108,6 +108,8 @@ class DocumentOut(Schema):
     title: str
     content: Optional[str] = None
     summary: Optional[str] = None
+    keywords: Optional[list[str]] = None
+    keywords_en: Optional[list[str]] = None
     number: Optional[str] = None
     date: Optional[dt_date] = None
     type: str = Field(..., alias="type.slug")
@@ -228,6 +230,8 @@ def search_documents(
                         or doc.metadata.get("mevzuat_no")
                     ),
                     "summary": doc.summary,
+                    "keywords": doc.keywords,
+                    "keywords_en": doc.keywords_en,
                     "date": doc.date.isoformat() if doc.date else None,
                 }
             }

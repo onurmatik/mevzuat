@@ -239,6 +239,8 @@ export default function SearchPage() {
             title: r.attributes.title || r.filename,
             content: null,
             summary: r.attributes.summary ?? null,
+            keywords: r.attributes.keywords ?? null,
+            keywords_en: r.attributes.keywords_en ?? null,
             number: r.attributes.number ?? null,
             type: r.type,
             date: r.attributes.date || null
