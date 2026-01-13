@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search as SearchIcon, Filter, Calendar, FileText, X, Bookmark, BookmarkCheck } from 'lucide-react';
+import { Search as SearchIcon, Filter, Calendar, FileText, X, Bookmark, BookmarkCheck, ArrowRight } from 'lucide-react';
 import { DOC_TYPE_LABELS, DocType } from '../data/documentTypes';
 import { DocumentCard } from '../components/DocumentCard';
 import { StatsChart } from '../components/StatsChart';
@@ -500,9 +500,8 @@ export default function SearchPage() {
                     </button>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    <span className="text-xs py-1">Relevance:
-                    </span>
+                  <div className="flex flex-wrap items-center gap-2 pl-7">
+                    <span className="text-xs py-1">Relevance:</span>
                     {RELATED_SCORE_OPTIONS.map((option) => (
                         <button
                             key={option.value}
@@ -518,8 +517,8 @@ export default function SearchPage() {
                           {option.label}
                         </button>
                     ))}
-                    <span className="text-xs py-1"> less results
-                    </span>
+                    <ArrowRight size={12} className="text-muted-foreground/70" aria-hidden="true" />
+                    <span className="text-xs py-1 text-muted-foreground">less results</span>
                   </div>
                 </div>
               )}
