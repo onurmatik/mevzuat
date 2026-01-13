@@ -7,6 +7,7 @@ import { StatsChart } from '../components/StatsChart';
 import { useLanguage } from '../store/language';
 import { useAuth } from '../store/auth';
 import { api, Document, StatsData } from '../lib/api';
+import { cn } from '../lib/utils';
 
 export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -59,10 +60,18 @@ export default function SearchPage() {
   const [offset, setOffset] = useState(0);
   const [statsData, setStatsData] = useState<StatsData[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [relatedMinScore, setRelatedMinScore] = useState(0.5);
 
   const PAGE_SIZE = 10;
   const MIN_RELEVANCE_SCORE = 0.5;
   const MAX_CHART_YEARS = 10;
+  const RELATED_SCORE_OPTIONS = [
+    { label: 'Very Low', value: 0.1 },
+    { label: 'Low', value: 0.3 },
+    { label: 'Medium', value: 0.5 },
+    { label: 'High', value: 0.7 },
+    { label: 'Very High', value: 0.9 },
+  ];
 
   const { chartTimeRange, chartRangeStart, chartRangeEnd } = useMemo(() => {
     if (dateRange === 'last-30') {
@@ -178,7 +187,11 @@ export default function SearchPage() {
         const statsParams: Record<string, any> = { ...restFilters };
         if (query) statsParams.query = query;
         if (relatedToId) statsParams.related_to = relatedToId;
-        if (query || relatedToId) statsParams.min_score = MIN_RELEVANCE_SCORE;
+        if (relatedToId) {
+          statsParams.min_score = relatedMinScore;
+        } else if (query) {
+          statsParams.min_score = MIN_RELEVANCE_SCORE;
+        }
 
         const interval =
           chartTimeRange === '30days' ? 'day' : chartTimeRange === '12months' ? 'month' : 'year';
@@ -203,14 +216,19 @@ export default function SearchPage() {
     return () => {
       cancelled = true;
     };
-  }, [query, selectedType, dateRange, customStartDate, customEndDate, relatedToId, chartTimeRange, chartRangeStart, chartRangeEnd]);
+  }, [query, selectedType, dateRange, customStartDate, customEndDate, relatedToId, chartTimeRange, chartRangeStart, chartRangeEnd, relatedMinScore]);
+
+  useEffect(() => {
+    if (!relatedToId) return;
+    setRelatedMinScore(0.5);
+  }, [relatedToId]);
 
   useEffect(() => {
     setOffset(0);
     setDocs([]);
     setHasMore(false);
     setLoadingMore(false);
-  }, [query, selectedType, dateRange, customStartDate, customEndDate, relatedToId]);
+  }, [query, selectedType, dateRange, customStartDate, customEndDate, relatedToId, relatedMinScore]);
 
   useEffect(() => {
     let cancelled = false;
@@ -231,7 +249,8 @@ export default function SearchPage() {
           const response = await api.searchDocuments(query || undefined, {
             ...filters,
             limit: PAGE_SIZE,
-            offset
+            offset,
+            min_score: relatedToId ? relatedMinScore : MIN_RELEVANCE_SCORE
           });
           results = response.data.map(r => ({
             id: r.attributes.id || 0,
@@ -278,7 +297,7 @@ export default function SearchPage() {
     return () => {
       cancelled = true;
     };
-  }, [query, selectedType, dateRange, customStartDate, customEndDate, relatedToId, offset]);
+  }, [query, selectedType, dateRange, customStartDate, customEndDate, relatedToId, relatedMinScore, offset]);
 
   const filteredDocs = docs; // Using state directly
 
@@ -457,27 +476,51 @@ export default function SearchPage() {
               </div>
 
               {relatedDoc && (
-                <div className="bg-primary/5 border border-primary/20 rounded-md px-4 py-3 flex items-start justify-between gap-4 animate-in fade-in slide-in-from-top-2">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 text-primary">
-                      <Filter size={16} />
+                <div className="bg-primary/5 border border-primary/20 rounded-md px-4 py-3 flex flex-col gap-3 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 text-primary">
+                        <Filter size={16} />
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-primary uppercase tracking-wide block mb-0.5">
+                          {t('search.related_to')}
+                        </span>
+                        <p className="text-sm font-medium text-foreground">
+                          {relatedDoc.title}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-xs font-semibold text-primary uppercase tracking-wide block mb-0.5">
-                        {t('search.related_to')}
-                      </span>
-                      <p className="text-sm font-medium text-foreground line-clamp-1">
-                        {relatedDoc.title}
-                      </p>
-                    </div>
+                    <button
+                      onClick={clearRelatedFilter}
+                      className="text-muted-foreground hover:text-foreground hover:bg-background/50 p-1 rounded transition-colors"
+                      title={t('search.clear_related')}
+                    >
+                      <X size={16} />
+                    </button>
                   </div>
-                  <button
-                    onClick={clearRelatedFilter}
-                    className="text-muted-foreground hover:text-foreground hover:bg-background/50 p-1 rounded transition-colors"
-                    title={t('search.clear_related')}
-                  >
-                    <X size={16} />
-                  </button>
+
+                  <div className="flex flex-wrap gap-2">
+                    <span className="text-xs py-1">Relevance:
+                    </span>
+                    {RELATED_SCORE_OPTIONS.map((option) => (
+                        <button
+                            key={option.value}
+                            onClick={() => setRelatedMinScore(option.value)}
+                            className={cn(
+                                "px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors",
+                                relatedMinScore === option.value
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-background text-muted-foreground hover:text-foreground hover:bg-secondary/70"
+                            )}
+                            type="button"
+                        >
+                          {option.label}
+                        </button>
+                    ))}
+                    <span className="text-xs py-1"> less results
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
