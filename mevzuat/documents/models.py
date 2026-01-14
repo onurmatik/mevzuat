@@ -3,6 +3,7 @@ import json
 import re
 import uuid
 from functools import cached_property
+from typing import Optional
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -10,6 +11,7 @@ from django.core.exceptions import ValidationError
 from pgvector.django import VectorField, L2Distance, HnswIndex, HalfVectorField
 from django.db import models
 from slugify import slugify
+from pydantic import BaseModel
 
 
 class DocumentType(models.Model):
@@ -262,65 +264,119 @@ class Document(models.Model):
         self.save(update_fields=["summary"])
         return self.summary
 
-    def translate(self, overwrite=False):
-        """Translate title and summary from Turkish to English using OpenAI.
-        
-        Stores translations in title_en and summary_en fields.
+    def translate(self, overwrite=False, keywords_only=False):
+        """Translate title, summary, and keywords from Turkish to English using OpenAI.
+
+        Stores translations in title_en, summary_en, and keywords_en fields.
         """
-        if not overwrite and self.title_en:
-            return {"title_en": self.title_en, "summary_en": self.summary_en}
-        
-        if not self.title:
+        if keywords_only:
+            needs_title = False
+            needs_summary = False
+        else:
+            needs_title = overwrite or not self.title_en
+            needs_summary = bool(self.summary) and (overwrite or not self.summary_en)
+        needs_keywords = bool(self.keywords) and (overwrite or not self.keywords_en)
+
+        if not overwrite and not needs_title and not needs_summary and not needs_keywords:
+            return {
+                "title_en": self.title_en,
+                "summary_en": self.summary_en,
+                "keywords_en": self.keywords_en,
+            }
+
+        if needs_title and not self.title:
             raise ValueError("Document has no title to translate")
-        
+
         from openai import OpenAI
         client = OpenAI()
-        
-        # Build the translation prompt
-        texts_to_translate = []
-        if self.title:
-            texts_to_translate.append(f"Title: {self.title}")
-        if self.summary:
-            texts_to_translate.append(f"Summary: {self.summary}")
-        
-        prompt = "Translate the following Turkish legal document metadata to English. Keep the format exactly as provided (Title: and Summary: labels).\n\n" + "\n\n".join(texts_to_translate)
-        
-        completion = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
+        class DocumentMetadata(BaseModel):
+            title: Optional[str] = None
+            summary: Optional[str] = None
+            keywords: list[str] = []
+
+        # Build the translation payload
+        payload = {}
+        if needs_title:
+            payload["title"] = self.title
+        if needs_summary:
+            payload["summary"] = self.summary
+        if needs_keywords:
+            keywords = [str(value).strip() for value in self.keywords if str(value).strip()]
+            if keywords:
+                payload["keywords"] = keywords
+            else:
+                needs_keywords = False
+
+        if not payload:
+            return {
+                "title_en": self.title_en,
+                "summary_en": self.summary_en,
+                "keywords_en": self.keywords_en,
+            }
+
+        response = client.responses.parse(
+            model="gpt-5-nano",
+            input=[
                 {
                     "role": "system",
-                    "content": "You are a professional translator specializing in Turkish legal documents. Translate accurately to English while preserving legal terminology.",
+                    "content": (
+                        "You are a professional translator specializing in Turkish legal documents. "
+                        "Translate the provided fields to English while preserving legal terminology. "
+                        "Return only translations for the fields that appear in the input."
+                    ),
                 },
                 {
                     "role": "user",
-                    "content": prompt,
+                    "content": json.dumps(payload, ensure_ascii=False),
                 },
             ],
+            text_format=DocumentMetadata,
         )
-        
-        response_text = completion.choices[0].message.content
-        
-        # Parse the response
-        lines = response_text.strip().split("\n")
-        for line in lines:
-            line = line.strip()
-            if line.lower().startswith("title:"):
-                self.title_en = line[6:].strip()
-            elif line.lower().startswith("summary:"):
-                self.summary_en = line[8:].strip()
-        
+
+        parsed = response.output_parsed
+        if parsed is None:
+            raise ValueError("Translation response missing parsed output")
+
+        # Apply translations
+        title_translated = False
+        summary_translated = False
+        keywords_translated = False
+
+        if needs_title and parsed.title:
+            self.title_en = parsed.title.strip()
+            title_translated = True
+        if needs_summary and parsed.summary:
+            self.summary_en = parsed.summary.strip()
+            summary_translated = True
+        if needs_keywords:
+            seen = set()
+            keywords_en = []
+            for value in parsed.keywords or []:
+                item = str(value).strip()
+                if not item or item in seen:
+                    continue
+                seen.add(item)
+                keywords_en.append(item)
+            self.keywords_en = keywords_en
+            keywords_translated = True
+
         # Save updated translations
         update_fields = []
-        if self.title_en:
+        if title_translated:
             update_fields.append("title_en")
-        if self.summary_en:
+        if summary_translated:
             update_fields.append("summary_en")
-        
+        if keywords_translated:
+            update_fields.append("keywords_en")
+
         if update_fields:
             self.save(update_fields=update_fields)
-        
-        return {"title_en": self.title_en, "summary_en": self.summary_en}
+
+        return {
+            "title_en": self.title_en,
+            "summary_en": self.summary_en,
+            "keywords_en": self.keywords_en,
+        }
 
     def extract_keywords(self, overwrite=False, max_keywords=8):
         """Extract keyword lists from the Turkish and English summaries."""
@@ -382,12 +438,7 @@ class Document(models.Model):
         if self.summary and (overwrite or not self.keywords):
             self.keywords = generate_keywords(self.summary, "Turkish")
             update_fields.append("keywords")
-        # TODO: move keyword_en to translate()
-        """
-        if self.summary_en and (overwrite or not self.keywords_en):
-            self.keywords_en = generate_keywords(self.summary_en, "English")
-            update_fields.append("keywords_en")
-        """
+        # keywords_en is populated in translate()
 
         if update_fields:
             self.save(update_fields=update_fields)

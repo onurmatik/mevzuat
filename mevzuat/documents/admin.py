@@ -89,6 +89,25 @@ class HasKeywordsFilter(admin.SimpleListFilter):
         return queryset
 
 
+class MissingKeywordsEnFilter(admin.SimpleListFilter):
+    title = "Missing keywords_en?"
+    parameter_name = "missing_keywords_en"
+
+    def lookups(self, request, model_admin):
+        return (("yes", "Yes"), ("no", "No"))
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        has_keywords = Q(keywords__isnull=False) & ~Q(keywords=[])
+        missing_keywords_en = Q(keywords_en__isnull=True) | Q(keywords_en=[])
+        needs_keywords_en = has_keywords & missing_keywords_en
+        if val == "yes":
+            return queryset.filter(needs_keywords_en)
+        if val == "no":
+            return queryset.exclude(needs_keywords_en)
+        return queryset
+
+
 
 
 class TranslatedFilter(admin.SimpleListFilter):
@@ -244,6 +263,7 @@ class DocumentAdmin(admin.ModelAdmin):
         HasMdFilter,
         HasEmbeddingFilter,
         HasKeywordsFilter,
+        MissingKeywordsEnFilter,
         TranslatedFilter,
         SummarizedFilter,
         FileSizeFilter,
@@ -261,6 +281,7 @@ class DocumentAdmin(admin.ModelAdmin):
         "summarize_documents",
         "extract_keywords",
         "translate_documents",
+        "translate_keywords_only",
     )
 
     def get_queryset(self, request):
@@ -744,5 +765,46 @@ class DocumentAdmin(admin.ModelAdmin):
             self.message_user(
                 request,
                 f"{obj.title} could not be translated: {exc}",
+                level=messages.ERROR,
+            )
+
+    def translate_keywords_only(self, request, queryset):
+        """Translate Turkish keywords to English for selected documents."""
+        ok = 0
+        skipped = 0
+        errors = []
+        for obj in queryset:
+            if not obj.keywords or obj.keywords_en:
+                skipped += 1
+                continue
+            try:
+                logger.info(
+                    "Translating keywords for document id=%s title=%s",
+                    obj.id,
+                    obj.title,
+                )
+                obj.translate(keywords_only=True)
+                ok += 1
+            except Exception as exc:  # pragma: no cover - defensive
+                errors.append((obj, exc))
+        if ok:
+            self.message_user(
+                request,
+                f"Successfully translated keywords for {ok} document(s).",
+                level=messages.SUCCESS,
+            )
+        if skipped:
+            self.message_user(
+                request,
+                (
+                    "Skipped {count} document(s) because keywords_en is already set "
+                    "or keywords are missing."
+                ).format(count=skipped),
+                level=messages.WARNING,
+            )
+        for obj, exc in errors:
+            self.message_user(
+                request,
+                f"{obj.title} could not translate keywords: {exc}",
                 level=messages.ERROR,
             )
