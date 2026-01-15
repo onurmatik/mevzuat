@@ -15,11 +15,23 @@ from ninja.errors import HttpError
 from ninja.params import Query
 from openai import OpenAI
 
-from mevzuat.documents.models import Document, DocumentType, FlaggedDocument, SearchQueryEmbedding
+from mevzuat.documents.models import (
+    Document,
+    DocumentType,
+    FlaggedDocument,
+    SavedDocument,
+    SavedSearch,
+    SearchQueryEmbedding,
+)
 from ninja.security import django_auth
 
 router = Router()
 QUERY_NORMALIZE_RE = re.compile(r"\s+")
+
+
+class SavedSearchIn(Schema):
+    query: Optional[str] = None
+    filters: dict[str, Any] = Field(default_factory=dict)
 
 
 def normalize_query(query: str) -> str:
@@ -121,6 +133,49 @@ def flag_document(request, uuid: UUID):
         flagged_by=request.user
     )
     return {"success": True}
+
+
+@router.post("/{document_uuid}/save", auth=django_auth)
+def save_document(request, document_uuid: UUID):
+    if not request.user.is_authenticated:
+        return 401, {"success": False, "message": "Unauthorized"}
+
+    doc = get_object_or_404(Document, uuid=document_uuid)
+    SavedDocument.objects.get_or_create(
+        document=doc,
+        saved_by=request.user,
+    )
+    return {"success": True}
+
+
+@router.delete("/{document_uuid}/save", auth=django_auth)
+def unsave_document(request, document_uuid: UUID):
+    if not request.user.is_authenticated:
+        return 401, {"success": False, "message": "Unauthorized"}
+
+    doc = get_object_or_404(Document, uuid=document_uuid)
+    SavedDocument.objects.filter(
+        document=doc,
+        saved_by=request.user,
+    ).delete()
+    return {"success": True}
+
+
+@router.post("/saved-searches", auth=django_auth)
+def save_search(request, payload: SavedSearchIn):
+    if not request.user.is_authenticated:
+        return 401, {"success": False, "message": "Unauthorized"}
+
+    query = payload.query.strip() if payload.query else None
+    if query == "":
+        query = None
+    filters = payload.filters or {}
+    saved_search, _ = SavedSearch.objects.get_or_create(
+        saved_by=request.user,
+        query=query,
+        filters=filters,
+    )
+    return {"success": True, "id": saved_search.id}
 
 
 class DocumentOut(Schema):
@@ -279,6 +334,15 @@ def search_documents(
     results = list(qs[offset:offset + limit])
     has_more = total_count > offset + limit
 
+    saved_ids = set()
+    if results and request.user.is_authenticated:
+        saved_ids = set(
+            SavedDocument.objects.filter(
+                saved_by=request.user,
+                document_id__in=[doc.id for doc in results],
+            ).values_list("document_id", flat=True)
+        )
+
     return {
         "data": [
             {
@@ -287,7 +351,8 @@ def search_documents(
                 "title": doc.title,
                 "type": doc.type.slug if doc.type else "unknown",
                 "date": doc.date.isoformat() if doc.date else None,
-                "score": round(1 - doc.distance, 4) if doc.distance else 0,
+                "score": round(1 - doc.distance, 4) if doc.distance is not None else 0,
+                "is_saved": doc.id in saved_ids,
                 "attributes": {
                     "id": doc.id,
                     "uuid": str(doc.uuid),

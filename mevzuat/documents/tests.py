@@ -18,7 +18,7 @@ from .admin import (
     SummarizedFilter,
     FlaggedDocumentAdmin,
 )
-from .models import Document, DocumentType, FlaggedDocument
+from .models import Document, DocumentType, FlaggedDocument, SavedDocument, SavedSearch
 
 
 class DocumentListAPITest(TestCase):
@@ -306,4 +306,58 @@ class FlaggingTest(TestCase):
         self.assertNotEqual(response.status_code, 200) # Should be 401 or 403 depending on auth config
 
 
+class SavedDocumentTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="testuser", password="password")
+        self.doc = Document.objects.create(title="Test Doc", markdown="Content", metadata={})
+        self.client.force_login(self.user)
 
+    def test_save_document(self):
+        response = self.client.post(f"/api/documents/{self.doc.uuid}/save")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(SavedDocument.objects.filter(document=self.doc, saved_by=self.user).exists())
+
+    def test_unsave_document(self):
+        SavedDocument.objects.create(document=self.doc, saved_by=self.user)
+        response = self.client.delete(f"/api/documents/{self.doc.uuid}/save")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(SavedDocument.objects.filter(document=self.doc, saved_by=self.user).exists())
+
+    def test_save_document_unauthenticated(self):
+        self.client.logout()
+        response = self.client.post(f"/api/documents/{self.doc.uuid}/save")
+        self.assertNotEqual(response.status_code, 200) # Should be 401 or 403 depending on auth config
+
+
+class SavedSearchTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="testuser", password="password")
+        self.client.force_login(self.user)
+
+    def test_save_search(self):
+        payload = {
+            "query": "vergi kanunu",
+            "filters": {
+                "type": "kanun",
+                "min_score": 0.5,
+                "date_range": "all",
+            },
+        }
+        response = self.client.post(
+            "/api/documents/saved-searches",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        saved = SavedSearch.objects.get(saved_by=self.user)
+        self.assertEqual(saved.query, "vergi kanunu")
+        self.assertEqual(saved.filters.get("type"), "kanun")
+
+    def test_save_search_unauthenticated(self):
+        self.client.logout()
+        response = self.client.post(
+            "/api/documents/saved-searches",
+            data=json.dumps({"query": "test", "filters": {}}),
+            content_type="application/json",
+        )
+        self.assertNotEqual(response.status_code, 200) # Should be 401 or 403 depending on auth config

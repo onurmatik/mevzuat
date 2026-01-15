@@ -12,6 +12,7 @@ export interface Document {
   document_url?: string | null;
   original_document_url?: string | null;
   number: string | null;
+  is_saved?: boolean;
 }
 
 export interface DocumentType {
@@ -26,6 +27,7 @@ export interface SearchResult {
   type: string;
   date: string | null;
   score: number;
+  is_saved?: boolean;
   attributes: Record<string, any>;
 }
 
@@ -113,6 +115,25 @@ export const api = {
   async flagDocument(uuid: string): Promise<{ success: boolean }> {
     return fetchApi<{ success: boolean }>(`/documents/${uuid}/flag`, {
       method: 'POST'
+    });
+  },
+
+  async saveDocument(uuid: string): Promise<{ success: boolean }> {
+    return fetchApi<{ success: boolean }>(`/documents/${uuid}/save`, {
+      method: 'POST'
+    });
+  },
+
+  async unsaveDocument(uuid: string): Promise<{ success: boolean }> {
+    return fetchApi<{ success: boolean }>(`/documents/${uuid}/save`, {
+      method: 'DELETE'
+    });
+  },
+
+  async saveSearch(payload: { query?: string | null; filters?: Record<string, any> }): Promise<{ success: boolean; id?: number }> {
+    return fetchApi<{ success: boolean; id?: number }>(`/documents/saved-searches`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
     });
   },
 

@@ -53,6 +53,8 @@ const translations: Record<string, Record<Language, string>> = {
   'doc.all_related': { tr: 'Tüm İlgili Belgeler', en: 'All Related Documents' },
   'doc.details': { tr: 'BELGE DETAYLARI', en: 'DOCUMENT DETAILS' },
   'doc.topics': { tr: 'İLGİLİ KONULAR', en: 'RELATED TOPICS' },
+  'doc.save_to_library': { tr: 'Kütüphaneye Ekle', en: 'Save to Library' },
+  'doc.remove_from_library': { tr: 'Kütüphaneden Kaldır', en: 'Remove from Library' },
   
   'search.save': { tr: 'Aramayı Kaydet', en: 'Save Search' },
   'search.saved': { tr: 'Arama Kaydedildi', en: 'Search Saved' },

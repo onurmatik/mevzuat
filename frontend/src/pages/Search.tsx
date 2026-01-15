@@ -88,6 +88,8 @@ export default function SearchPage() {
   const [offset, setOffset] = useState(0);
   const [statsData, setStatsData] = useState<StatsData[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [savingIds, setSavingIds] = useState<Record<string, boolean>>({});
+  const [savingSearch, setSavingSearch] = useState(false);
 
   const PAGE_SIZE = 10;
   const MAX_CHART_YEARS = 10;
@@ -287,7 +289,8 @@ export default function SearchPage() {
             keywords_en: r.attributes.keywords_en ?? null,
             number: r.attributes.number ?? null,
             type: r.type,
-            date: r.attributes.date || null
+            date: r.attributes.date || null,
+            is_saved: r.is_saved ?? false
           }));
           more = response.has_more;
         } else {
@@ -340,12 +343,56 @@ export default function SearchPage() {
     setSearchParams(newParams);
   };
 
-  const handleSaveSearch = () => {
-    if (isAuthenticated) {
-      setIsSaved(true);
-      // In a real app, API call to save search
-    } else {
+  const handleSaveSearch = async () => {
+    if (!isAuthenticated) {
       openAuthModal();
+      return;
+    }
+    setSavingSearch(true);
+    try {
+      const filters = {
+        ...buildFilters(),
+        date_range: dateRange,
+        custom_start_date: customStartDate || null,
+        custom_end_date: customEndDate || null,
+        min_score: minScore,
+      };
+      await api.saveSearch({
+        query: query.trim() || null,
+        filters
+      });
+      setIsSaved(true);
+    } catch (e) {
+      console.error("Failed to save search", e);
+    } finally {
+      setSavingSearch(false);
+    }
+  };
+
+  const handleToggleSave = async (doc: Document) => {
+    if (!isAuthenticated) {
+      openAuthModal();
+      return;
+    }
+    const nextSaved = !doc.is_saved;
+    setSavingIds((prev) => ({ ...prev, [doc.uuid]: true }));
+    try {
+      if (nextSaved) {
+        await api.saveDocument(doc.uuid);
+      } else {
+        await api.unsaveDocument(doc.uuid);
+      }
+      setDocs((prev) => prev.map((item) => (
+        item.uuid === doc.uuid ? { ...item, is_saved: nextSaved } : item
+      )));
+    } catch (e) {
+      console.error("Failed to toggle saved state", e);
+    } finally {
+      setSavingIds((prev) => {
+        const next = { ...prev };
+        delete next[doc.uuid];
+        return next;
+      });
     }
   };
 
@@ -562,7 +609,7 @@ export default function SearchPage() {
 
               <button
                 onClick={handleSaveSearch}
-                disabled={isSaved}
+                disabled={isSaved || savingSearch}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${isSaved
                   ? 'bg-green-500/10 text-green-600 cursor-default'
                   : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
@@ -585,7 +632,14 @@ export default function SearchPage() {
             ) : filteredDocs.length > 0 ? (
               <div className="flex flex-col gap-4">
                 {filteredDocs.map((doc) => (
-                  <DocumentCard key={doc.id} doc={doc} onRelated={handleRelatedFilter} />
+                  <DocumentCard
+                    key={doc.id}
+                    doc={doc}
+                    onRelated={handleRelatedFilter}
+                    showSaveAction
+                    isSaving={Boolean(savingIds[doc.uuid])}
+                    onToggleSave={handleToggleSave}
+                  />
                 ))}
                 {hasMore && (
                   <div className="flex justify-center pt-4">

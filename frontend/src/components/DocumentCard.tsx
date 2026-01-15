@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Hash, Calendar, FileText } from 'lucide-react';
+import { Hash, Calendar, Bookmark, BookmarkCheck } from 'lucide-react';
 import { Document } from '../lib/api';
 import { DOC_TYPE_LABELS } from '../data/documentTypes';
 import { cn } from '../lib/utils';
@@ -10,10 +10,20 @@ interface DocumentCardProps {
   doc: Document;
   onRelated?: (doc: Document) => void;
   showKeywords?: boolean;
+  showSaveAction?: boolean;
+  isSaving?: boolean;
+  onToggleSave?: (doc: Document) => void;
 }
 
-export function DocumentCard({ doc, onRelated, showKeywords = true }: DocumentCardProps) {
-  const { language } = useLanguage();
+export function DocumentCard({
+  doc,
+  onRelated,
+  showKeywords = true,
+  showSaveAction = false,
+  isSaving = false,
+  onToggleSave,
+}: DocumentCardProps) {
+  const { language, t } = useLanguage();
   const typeKey = doc.type;
   const typeLabel = (DOC_TYPE_LABELS as any)[typeKey]?.[language] || doc.type;
   const numberLabel = doc.number ?? '-';
@@ -21,6 +31,8 @@ export function DocumentCard({ doc, onRelated, showKeywords = true }: DocumentCa
     language === 'en' && doc.keywords_en && doc.keywords_en.length > 0
       ? doc.keywords_en
       : (doc.keywords || []);
+  const isSaved = Boolean(doc.is_saved);
+  const saveLabel = isSaved ? t('doc.remove_from_library') : t('doc.save_to_library');
 
   return (
     <Link to={`/document/${doc.uuid}`} className="block group h-full">
@@ -35,9 +47,34 @@ export function DocumentCard({ doc, onRelated, showKeywords = true }: DocumentCa
               {numberLabel}
             </span>
           </div>
-          <div className="flex items-center text-xs text-muted-foreground tabular-nums">
-            <Calendar size={12} className="mr-1.5" />
-            {doc.date}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center text-xs text-muted-foreground tabular-nums">
+              <Calendar size={12} className="mr-1.5" />
+              {doc.date}
+            </div>
+            {showSaveAction && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onToggleSave?.(doc);
+                }}
+                disabled={isSaving}
+                title={saveLabel}
+                aria-label={saveLabel}
+                aria-pressed={isSaved}
+                className={cn(
+                  "inline-flex h-8 w-8 items-center justify-center rounded-md border border-border/60 transition-colors",
+                  isSaved
+                    ? "bg-primary/10 text-primary hover:bg-primary/15"
+                    : "bg-background text-muted-foreground hover:text-foreground hover:bg-secondary/60",
+                  isSaving && "opacity-60 cursor-wait"
+                )}
+              >
+                {isSaved ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
+              </button>
+            )}
           </div>
         </div>
 

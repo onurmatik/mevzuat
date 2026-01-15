@@ -462,6 +462,34 @@ class FlaggedDocument(models.Model):
         return f"{self.document.title} {self.flagged_by} {self.flagged_at}"
 
 
+class SavedDocument(models.Model):
+    document = models.ForeignKey(Document, on_delete=models.CASCADE)
+    saved_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    saved_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document", "saved_by"],
+                name="unique_saved_document",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.document.title} {self.saved_by} {self.saved_at}"
+
+
+class SavedSearch(models.Model):
+    query = models.TextField(blank=True, null=True)
+    filters = models.JSONField(default=dict, blank=True)
+    saved_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    saved_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        base = self.query or "search"
+        return f"{self.saved_by} {base}"
+
+
 class SearchQueryEmbedding(models.Model):
     query = models.TextField()
     normalized_query = models.TextField(unique=True)
