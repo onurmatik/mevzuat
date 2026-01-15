@@ -136,6 +136,12 @@ export default function SearchPage() {
     return statsData.reduce((sum, item) => sum + item.count, 0);
   }, [statsData]);
 
+  const totalResultsLabel = useMemo(() => {
+    if (statsLoading) return '...';
+    const locale = language === 'tr' ? 'tr-TR' : 'en-US';
+    return new Intl.NumberFormat(locale).format(statsTotal);
+  }, [statsLoading, statsTotal, language]);
+
   const handleRelatedFilter = useCallback((doc: Document) => {
     const newParams = new URLSearchParams(searchParams);
     newParams.set('related_to', doc.uuid);
@@ -551,7 +557,7 @@ export default function SearchPage() {
 
             <div className="flex items-center justify-between mb-6 pb-2 border-b border-border/50">
               <h2 className="text-sm font-medium text-muted-foreground">
-                Showing {filteredDocs.length} results
+                Showing {filteredDocs.length} / {totalResultsLabel} results
               </h2>
 
               <button
