@@ -237,6 +237,7 @@ class EmbeddingGenerationTest(TestCase):
         self.doc = Document.objects.create(
             title="Test Doc",
             summary="Test Summary",
+            keywords=["alpha", "beta"],
             markdown="Content " * 5000, # ~40k chars
             metadata={}
         )
@@ -252,7 +253,8 @@ class EmbeddingGenerationTest(TestCase):
         sent_text = call_args.kwargs['input']
         
         self.assertIn("Test Doc", sent_text)
-        # Summary checks removed as summary is no longer included
+        self.assertIn("Test Summary", sent_text)
+        self.assertIn("alpha", sent_text)
         self.assertIn("Content", sent_text)
 
     @patch("openai.OpenAI")
@@ -302,7 +304,6 @@ class FlaggingTest(TestCase):
         self.client.logout()
         response = self.client.post(f"/api/documents/{self.doc.uuid}/flag")
         self.assertNotEqual(response.status_code, 200) # Should be 401 or 403 depending on auth config
-
 
 
 

@@ -10,7 +10,7 @@ class Command(BaseCommand):
 
     help = (
         "Fetch latest documents and process them (download, markdown, embeddings, "
-        "summary, translation) for active document types"
+        "summary, keywords, translation) for active document types"
     )
 
     def handle(self, *args, **options):
@@ -57,8 +57,9 @@ class Command(BaseCommand):
 
         self._download_documents(new_docs)
         self._convert_to_markdown(new_docs)
-        self._generate_embeddings(new_docs)
         self._summarize_documents(new_docs)
+        self._extract_keywords(new_docs)
+        self._generate_embeddings(new_docs)
         self._translate_documents(new_docs)
 
     def _download_documents(self, queryset):
@@ -171,15 +172,46 @@ class Command(BaseCommand):
                 self.style.ERROR(f"{errors} document(s) failed summary generation.")
             )
 
-    def _translate_documents(self, queryset):
+    def _extract_keywords(self, queryset):
         missing_summary = Q(summary__isnull=True) | Q(summary="")
-        missing_translation = (
-            Q(title_en__isnull=True)
-            | Q(title_en="")
-            | Q(summary_en__isnull=True)
-            | Q(summary_en="")
-        )
-        to_translate = queryset.filter(missing_translation).exclude(missing_summary)
+        missing_keywords = Q(keywords__isnull=True) | Q(keywords=[])
+        to_extract = queryset.filter(missing_keywords).exclude(missing_summary)
+        total = to_extract.count()
+        if total == 0:
+            self.stdout.write(self.style.SUCCESS("No new documents need keywords."))
+            return
+
+        errors = 0
+        for doc in to_extract.iterator():
+            try:
+                doc.extract_keywords(overwrite=False)
+            except Exception as exc:  # pragma: no cover - defensive
+                errors += 1
+                self.stderr.write(f"Keyword extraction failed for document {doc.pk}: {exc}")
+
+        extracted = total - errors
+        if extracted:
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Generated keywords for {extracted}/{total} documents."
+                )
+            )
+        if errors:
+            self.stderr.write(
+                self.style.ERROR(f"{errors} document(s) failed keyword extraction.")
+            )
+
+    def _translate_documents(self, queryset):
+        missing_title = Q(title_en__isnull=True) | Q(title_en="")
+        missing_summary_en = Q(summary_en__isnull=True) | Q(summary_en="")
+        missing_keywords_en = Q(keywords_en__isnull=True) | Q(keywords_en=[])
+        has_summary = Q(summary__isnull=False) & ~Q(summary="")
+        has_keywords = Q(keywords__isnull=False) & ~Q(keywords=[])
+
+        needs_title = missing_title
+        needs_summary = has_summary & missing_summary_en
+        needs_keywords = has_keywords & missing_keywords_en
+        to_translate = queryset.filter(needs_title | needs_summary | needs_keywords)
         total = to_translate.count()
         if total == 0:
             self.stdout.write(self.style.SUCCESS("No new documents need translations."))

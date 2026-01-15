@@ -171,24 +171,31 @@ class Document(models.Model):
         Uses text-embedding-3-small model (1536 dimensions) to create
         a vector representation of the document's markdown content.
         
-        Includes title and summary in the embedded text, and retries with
+        Includes title, summary, and keywords in the embedded text, and retries with
         smaller chunks if the context length is exceeded.
         """
         if self.embedding is not None and not overwrite:
             return self.embedding
-        
-        if not self.markdown:
-            # Fallback: if no markdown, at least try with title/summary
-            if not self.title:
-                raise ValueError("Document has no content to embed (no markdown or title)")
-        
+
         from openai import OpenAI, BadRequestError
         client = OpenAI()
-        
-        full_text = f"{self.title}\n\n{self.markdown}"
-        
+
+        parts = []
+        if self.title:
+            parts.append(self.title)
+        if self.summary:
+            parts.append(self.summary)
+        if self.keywords:
+            keywords = [kw for kw in self.keywords if kw]
+            if keywords:
+                parts.append(', '.join(map(str, keywords)))
+        if self.markdown:
+            parts.append(self.markdown)
+
+        full_text = "\n\n".join(parts)
+
         if not full_text.strip():
-             raise ValueError("No content to embed")
+            raise ValueError("Document has no content to embed")
 
         # Retry logic for context length
         # Start with a safe-ish upper bound. The model limit is 8191 tokens.

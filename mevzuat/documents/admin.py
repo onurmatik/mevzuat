@@ -632,8 +632,6 @@ class DocumentAdmin(admin.ModelAdmin):
                 level=messages.ERROR,
             )
 
-
-
     def generate_embeddings(self, request, queryset):
         """Generate embeddings for selected documents."""
         ok = 0
