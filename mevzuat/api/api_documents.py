@@ -5,7 +5,7 @@ import re
 
 from django.utils import timezone
 from django.db import IntegrityError
-from django.db.models import Count, IntegerField, Value
+from django.db.models import Count, IntegerField, Value, Q, F, FloatField, ExpressionWrapper, TextField
 from django.db.models.functions import Cast, Coalesce, TruncDay, TruncMonth, TruncYear
 from django.db.models.fields.json import KeyTextTransform
 from django.shortcuts import get_object_or_404
@@ -24,6 +24,29 @@ QUERY_NORMALIZE_RE = re.compile(r"\s+")
 
 def normalize_query(query: str) -> str:
     return QUERY_NORMALIZE_RE.sub(" ", query).strip()
+
+
+def annotate_text_search_fields(qs):
+    return qs.annotate(
+        keywords_text=Cast("keywords", output_field=TextField()),
+        keywords_en_text=Cast("keywords_en", output_field=TextField()),
+    )
+
+
+def build_text_search_query(normalized_query: str) -> Q:
+    tokens = [token for token in normalized_query.split(" ") if len(token) >= 3]
+    if not tokens:
+        tokens = [normalized_query]
+    text_query = Q()
+    for token in tokens:
+        text_query |= (
+            Q(title__icontains=token)
+            | Q(summary__icontains=token)
+            | Q(markdown__icontains=token)
+            | Q(keywords_text__icontains=token)
+            | Q(keywords_en_text__icontains=token)
+        )
+    return text_query
 
 
 def resolve_query_embedding(query: Optional[str]) -> tuple[Optional[str], Optional[list[float]]]:
@@ -175,10 +198,11 @@ def search_documents(
     limit: int = Query(10),
     offset: int = Query(0),
 ):
-    """Search documents using local pgvector similarity search.
+    """Search documents using local pgvector similarity search with keyword matching.
 
     ``query`` is optional if ``related_to`` is supplied. The query is converted to an embedding vector
-    and compared against document embeddings using cosine similarity.
+    and compared against document embeddings using cosine similarity. Keyword matches in titles,
+    summaries, keywords, and markdown are also included when a query is provided.
     Optional parameters allow filtering by document type and date ranges.
     """
     from pgvector.django import CosineDistance
@@ -187,22 +211,15 @@ def search_documents(
     if related_to:
         related_doc = get_object_or_404(Document, uuid=related_to)
 
-    _, query_embedding = resolve_query_embedding(query)
+    normalized_query, query_embedding = resolve_query_embedding(query)
     related_embedding = resolve_related_embedding(related_doc)
+    text_query = build_text_search_query(normalized_query) if normalized_query else None
 
-    if query_embedding is not None and related_embedding is not None:
-        query_embedding = [
-            (left + right) / 2.0
-            for left, right in zip(query_embedding, related_embedding)
-        ]
-    elif related_embedding is not None:
-        query_embedding = related_embedding
-
-    if query_embedding is None:
+    if query_embedding is None and related_embedding is None and text_query is None:
         raise HttpError(400, "Search requires a query or related_to parameter")
 
-    # Build queryset with filters - only include documents with embeddings
-    qs = Document.objects.exclude(embedding__isnull=True).select_related("type")
+    # Build queryset with filters
+    qs = Document.objects.select_related("type")
     if related_doc:
         qs = qs.exclude(uuid=related_doc.uuid)
 
@@ -216,11 +233,44 @@ def search_documents(
     if end_date:
         qs = qs.filter(date__lte=end_date)
 
-    # Order by cosine similarity (lower distance = more similar)
+    if text_query is not None:
+        qs = annotate_text_search_fields(qs)
+
+    if query_embedding is not None:
+        qs = qs.annotate(distance_query=CosineDistance("embedding", query_embedding))
+    if related_embedding is not None:
+        qs = qs.annotate(distance_related=CosineDistance("embedding", related_embedding))
+
+    threshold = 1 - min_score
+    filters = Q()
+    if related_embedding is not None:
+        filters &= Q(distance_related__lte=threshold)
+
+    if query_embedding is not None or text_query is not None:
+        query_filters = Q()
+        if query_embedding is not None:
+            query_filters |= Q(distance_query__lte=threshold)
+        if text_query is not None:
+            query_filters |= text_query
+        filters &= query_filters
+
+    qs = qs.filter(filters)
+
+    if query_embedding is not None and related_embedding is not None:
+        qs = qs.annotate(
+            distance=ExpressionWrapper(
+                (F("distance_query") + F("distance_related")) / 2.0,
+                output_field=FloatField(),
+            )
+        )
+    elif query_embedding is not None:
+        qs = qs.annotate(distance=F("distance_query"))
+    elif related_embedding is not None:
+        qs = qs.annotate(distance=F("distance_related"))
+
     qs = qs.annotate(
-        distance=CosineDistance("embedding", query_embedding)
-    ).order_by("distance")
-    qs = qs.filter(distance__lte=1 - min_score)
+        sort_distance=Coalesce(F("distance"), Value(2.0))
+    ).order_by("sort_distance")
 
     # Get total count before pagination
     total_count = qs.count()
@@ -314,14 +364,7 @@ def document_counts(
     if normalized_query:
         _, query_embedding = resolve_query_embedding(query)
     related_embedding = resolve_related_embedding(related_doc)
-
-    if query_embedding is not None and related_embedding is not None:
-        query_embedding = [
-            (left + right) / 2.0
-            for left, right in zip(query_embedding, related_embedding)
-        ]
-    elif related_embedding is not None:
-        query_embedding = related_embedding
+    text_query = build_text_search_query(normalized_query) if normalized_query else None
 
     qs = Document.objects.all()
     if type:
@@ -329,12 +372,28 @@ def document_counts(
             qs = qs.filter(type_id=int(type))
         else:
             qs = qs.filter(type__slug=type)
+    if related_doc:
+        qs = qs.exclude(uuid=related_doc.uuid)
+    if text_query is not None:
+        qs = annotate_text_search_fields(qs)
     if query_embedding is not None:
-        qs = qs.exclude(embedding__isnull=True)
-        if related_doc:
-            qs = qs.exclude(uuid=related_doc.uuid)
-        qs = qs.annotate(distance=CosineDistance("embedding", query_embedding))
-        qs = qs.filter(distance__lte=1 - min_score)
+        qs = qs.annotate(distance_query=CosineDistance("embedding", query_embedding))
+    if related_embedding is not None:
+        qs = qs.annotate(distance_related=CosineDistance("embedding", related_embedding))
+
+    threshold = 1 - min_score
+    filters = Q()
+    if related_embedding is not None:
+        filters &= Q(distance_related__lte=threshold)
+    if query_embedding is not None or text_query is not None:
+        query_filters = Q()
+        if query_embedding is not None:
+            query_filters |= Q(distance_query__lte=threshold)
+        if text_query is not None:
+            query_filters |= text_query
+        filters &= query_filters
+    if filters:
+        qs = qs.filter(filters)
 
     # --- Default date boundaries ------------------------------------------------
     if start_date is None:
