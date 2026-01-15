@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import { ArrowLeft, Share2, Printer, Download, Clock, Hash, FileText, ArrowUpRight, BookOpen, Scale, Flag } from 'lucide-react';
@@ -19,6 +19,11 @@ export default function DocumentDetail() {
   const [showFlagConfirm, setShowFlagConfirm] = useState(false);
 
   const { t, language } = useLanguage();
+
+  const summaryMarkdown = useMemo(() => {
+    if (!doc?.summary) return '';
+    return doc.summary.replace(/^\s*-\s+/gm, '- ');
+  }, [doc?.summary]);
 
   useEffect(() => {
     async function load() {
@@ -250,9 +255,23 @@ export default function DocumentDetail() {
 
               <div className="bg-muted/30 rounded-lg p-5 border border-border/50 relative group">
                 {doc.summary ? (
-                  <p className="text-lg text-muted-foreground italic leading-relaxed">
-                    {doc.summary}
-                  </p>
+                  <div className="text-lg text-muted-foreground italic leading-relaxed">
+                    <Markdown
+                      components={{
+                        ul: ({ ...props }) => (
+                          <ul className="list-disc pl-6 space-y-2" {...props} />
+                        ),
+                        li: ({ ...props }) => (
+                          <li className="leading-relaxed" {...props} />
+                        ),
+                        p: ({ ...props }) => (
+                          <p className="leading-relaxed" {...props} />
+                        ),
+                      }}
+                    >
+                      {summaryMarkdown}
+                    </Markdown>
+                  </div>
                 ) : (
                   <p className="text-sm text-muted-foreground italic">No summary available.</p>
                 )}
