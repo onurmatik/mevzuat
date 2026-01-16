@@ -99,7 +99,7 @@ class BaseDocFetcher(abc.ABC):
             tmp.write(pdf_bytes)
             tmp_path = tmp.name
 
-        max_pages = 10
+        max_pages = 5
         page_limit = max_pages
         markdown_text = None
         last_error = None
@@ -109,7 +109,7 @@ class BaseDocFetcher(abc.ABC):
                 try:
                     result = converter.convert(
                         tmp_path,
-                        max_num_pages=page_limit,
+                        # page_range limits conversion without rejecting large PDFs
                         page_range=(1, page_limit),
                     )
                     markdown_text = result.document.export_to_markdown()
