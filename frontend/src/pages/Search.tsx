@@ -43,6 +43,7 @@ export default function SearchPage() {
   const relatedToId = searchParams.get('related_to');
 
   const queryParam = searchParams.get('q');
+  const [inputQuery, setInputQuery] = useState(queryParam ?? '');
   const [query, setQuery] = useState(queryParam ?? '');
   const [selectedType, setSelectedType] = useState<string | 'all'>('all');
   const [dateRange, setDateRange] = useState<'all' | 'last-30' | 'last-year' | 'custom'>('all');
@@ -78,7 +79,9 @@ export default function SearchPage() {
   }, [relatedToId]);
 
   useEffect(() => {
-    setQuery(queryParam ?? '');
+    const nextQuery = queryParam ?? '';
+    setQuery(nextQuery);
+    setInputQuery(nextQuery);
   }, [queryParam]);
 
   const [docs, setDocs] = useState<Document[]>([]);
@@ -343,6 +346,18 @@ export default function SearchPage() {
     setSearchParams(newParams);
   };
 
+  const handleQuerySubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const trimmed = inputQuery.trim();
+    const newParams = new URLSearchParams(searchParams);
+    if (trimmed) {
+      newParams.set('q', trimmed);
+    } else {
+      newParams.delete('q');
+    }
+    setSearchParams(newParams);
+  };
+
   const handleSaveSearch = async () => {
     if (!isAuthenticated) {
       openAuthModal();
@@ -562,16 +577,24 @@ export default function SearchPage() {
           {/* Main Content */}
           <div className="flex-1">
             <div className="flex flex-col gap-4 mb-6">
-              <div className="relative w-full">
+              <form className="relative w-full" onSubmit={handleQuerySubmit}>
                 <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground h-5 w-5" />
                 <input
                   type="text"
-                  className="w-full h-12 pl-12 pr-4 bg-background border border-input rounded-lg text-base shadow-sm focus:ring-2 focus:ring-ring focus:border-input transition-all placeholder:text-muted-foreground"
+                  className="w-full h-12 pl-12 pr-28 bg-background border border-input rounded-lg text-base shadow-sm focus:ring-2 focus:ring-ring focus:border-input transition-all placeholder:text-muted-foreground"
                   placeholder={t('hero.search_placeholder')}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  value={inputQuery}
+                  onChange={(e) => setInputQuery(e.target.value)}
                 />
-              </div>
+                <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                  <button
+                    type="submit"
+                    className="bg-primary text-primary-foreground h-9 px-5 rounded-md text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors"
+                  >
+                    {t('hero.search_action')}
+                  </button>
+                </div>
+              </form>
 
               {relatedDoc && (
                 <div className="bg-primary/5 border border-primary/20 rounded-md px-4 py-3 flex flex-col gap-3 animate-in fade-in slide-in-from-top-2">
@@ -663,11 +686,13 @@ export default function SearchPage() {
                 <p className="text-sm text-muted-foreground mb-4">Try adjusting your search or filters.</p>
                 <button
                   onClick={() => {
-                    setQuery('');
                     setSelectedType('all');
                     setDateRange('all');
                     setMinScore(0.5);
-                    clearRelatedFilter();
+                    const newParams = new URLSearchParams(searchParams);
+                    newParams.delete('q');
+                    newParams.delete('related_to');
+                    setSearchParams(newParams);
                   }}
                   className="text-sm font-medium text-primary hover:underline"
                 >
