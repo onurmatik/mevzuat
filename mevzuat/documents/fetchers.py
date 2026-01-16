@@ -99,14 +99,35 @@ class BaseDocFetcher(abc.ABC):
             tmp.write(pdf_bytes)
             tmp_path = tmp.name
 
-        result = None
+        max_pages = 10
+        page_limit = max_pages
+        markdown_text = None
+        last_error = None
         try:
-            result = converter.convert(tmp_path)
-            markdown_text = result.document.export_to_markdown()
+            while page_limit >= 1:
+                result = None
+                try:
+                    result = converter.convert(
+                        tmp_path,
+                        max_num_pages=page_limit,
+                        page_range=(1, page_limit),
+                    )
+                    markdown_text = result.document.export_to_markdown()
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    if page_limit == 1:
+                        break
+                    page_limit = max(1, page_limit // 2)
+                finally:
+                    self._cleanup_conversion(result)
+            if markdown_text is None:
+                if last_error is not None:
+                    raise last_error
+                raise RuntimeError("Markdown conversion failed without an error")
         finally:
-            # Ensure temp file is removed and PDF resources are freed even if conversion fails
+            # Ensure temp file is removed even if conversion fails
             os.remove(tmp_path)
-            self._cleanup_conversion(result)
 
         with transaction.atomic():
             doc.markdown = markdown_text
